@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إدارة المخزون</title>
+<link rel="stylesheet" href="style.css">
+<!-- مكتبة Supabase (تسجيل الدخول وقاعدة البيانات) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- مكتبة تصدير ملفات Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ================= شاشة تسجيل الدخول ================= -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="login-logo" id="login-logo"></div>
+      <div class="login-title" id="login-name">مصنع نسيج</div>
+      <div class="login-sub">تسجيل الدخول لإدارة المخزون</div>
+      <div id="login-error" class="login-error hidden"></div>
+      <form id="login-form">
+        <div class="field">
+          <label>اسم المستخدم</label>
+          <input id="login-username" autocomplete="username" required placeholder="مثال: ahmed">
+        </div>
+        <div class="field">
+          <label>كلمة المرور</label>
+          <input id="login-password" type="password" autocomplete="current-password" required placeholder="••••••••">
+        </div>
+        <button type="submit" id="login-submit" class="btn-primary">تسجيل الدخول</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= التطبيق بعد الدخول ================= -->
+  <div id="app-shell" class="hidden">
+    <div id="alert-banner" class="alert-banner hidden"></div>
+    <div class="layout">
+      <aside id="sidebar">
+        <div class="brand">
+          <div class="logo" id="side-logo"></div>
+          <div>
+            <div class="brand-name" id="brand-name">مصنع نسيج</div>
+            <div class="brand-sub">إدارة المخزون</div>
+          </div>
+        </div>
+        <div id="nav-list"></div>
+        <div class="who">
+          <span class="who-name" id="who-name"></span>
+          <button class="logout-btn" id="logout-btn">خروج</button>
+        </div>
+        <div class="nav-footer">البيانات محفوظة تلقائيًا ومشتركة بين كل العاملين المسجّلين</div>
+      </aside>
+      <main id="main"></main>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
