@@ -767,12 +767,12 @@ function renderSettings(main) {
 function renderUsers(main) {
   const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">إدارة المستخدمين</div><div class="section-sub">تحديد صلاحيات كل مستخدم، وإيقاف أو تفعيل الحسابات</div></div></div>
-    <div style="background:var(--mustard-soft); color:#8A6A16; font-size:12px; font-weight:600; padding:10px 14px; border-radius:10px; margin-bottom:16px;">
-      إنشاء حسابات الدخول (اسم المستخدم وكلمة المرور) لازم يتم من لوحة تحكم Supabase حاليًا. من هنا تقدر تتحكم في صلاحية كل حساب موجود بالفعل (مدير / أمين مخزن / قراءة فقط) وتوقف أو تفعّل أي حساب.
+    <div class="section-header">
+      <div><div class="section-title">إدارة المستخدمين</div><div class="section-sub">إنشاء الحسابات، تحديد الصلاحيات، إيقاف أو حذف المستخدمين</div></div>
+      <button class="btn-dark" id="new-user-btn">${icon("plus", 15)} مستخدم جديد</button>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th>الجهاز</th></tr></thead><tbody id="users-body"></tbody></table>
+      <table><thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th>الجهاز</th><th></th></tr></thead><tbody id="users-body"></tbody></table>
     </div>`;
   $("#users-body").innerHTML = state.profiles.map(p => `
     <tr>
@@ -789,6 +789,7 @@ function renderUsers(main) {
       </td>
       <td style="color:var(--ink70); font-size:12.5px;" class="mono">${p.last_login ? fmtDate(p.last_login) : "—"}</td>
       <td style="color:var(--ink70); font-size:12.5px;">${p.last_login_device || "—"}</td>
+      <td>${p.id === state.user.id ? "" : `<button class="icon-btn" style="color:var(--red);" data-del-user="${p.id}">${icon("trash", 14)}</button>`}</td>
     </tr>`).join("");
   $$("[data-role]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("profiles").update({ role: sel.value }).eq("id", sel.dataset.role);
@@ -797,6 +798,15 @@ function renderUsers(main) {
     logAudit({ action: "تغيير دور مستخدم", entity: "user", entityName: p?.full_name, details: `الدور الجديد: ${roleLabels[sel.value]}` });
     await loadProfiles(); renderUsers(main); toast("تم تحديث الدور");
   });
+  $$("[data-del-user]").forEach(btn => btn.onclick = async () => {
+    const p = state.profiles.find(x => x.id === btn.dataset.delUser);
+    if (!confirm(`حذف حساب "${p.full_name}" نهائيًا؟ الحساب مش هيقدر يسجل دخول تاني، والعملية دي لا يمكن التراجع عنها.`)) return;
+    const res = await callManageUsers({ action: "delete", userId: p.id });
+    if (res.error) { toast(res.error, true); return; }
+    logAudit({ action: "حذف حساب مستخدم نهائيًا", entity: "user", entityName: p.full_name });
+    await loadProfiles(); renderUsers(main); toast("تم حذف الحساب نهائيًا");
+  });
+  $("#new-user-btn").onclick = () => openNewUserModal(main);
   $$("[data-toggle]").forEach(btn => btn.onclick = async () => {
     const p = state.profiles.find(x => x.id === btn.dataset.toggle);
     const newVal = !(p.is_active !== false);
@@ -805,6 +815,64 @@ function renderUsers(main) {
     logAudit({ action: newVal ? "تفعيل حساب" : "إيقاف حساب", entity: "user", entityName: p.full_name });
     await loadProfiles(); renderUsers(main); toast(newVal ? "تم تفعيل الحساب" : "تم إيقاف الحساب");
   });
+}
+
+/* ---------------- استدعاء Edge Function الخاصة بإدارة المستخدمين ---------------- */
+async function callManageUsers(payload) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || "حدث خطأ غير متوقع" };
+    return json;
+  } catch (e) {
+    return { error: "تعذر الاتصال بخدمة إدارة المستخدمين — تأكد إن الـ Edge Function متنشرة (راجع README)" };
+  }
+}
+
+function openNewUserModal(main) {
+  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">مستخدم جديد</div>
+        <button class="close-x" id="nu-close">${icon("x", 15)}</button>
+      </div>
+      <div class="field"><label>اسم المستخدم (بالإنجليزي، بدون مسافات)</label><input id="nu-username" class="input" style="width:100%;" placeholder="مثال: sara"></div>
+      <div class="field"><label>الاسم الكامل</label><input id="nu-fullname" class="input" style="width:100%;" placeholder="مثال: سارة أحمد"></div>
+      <div class="field"><label>كلمة المرور</label><input id="nu-password" type="password" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
+      <div class="field"><label>الدور</label>
+        <select id="nu-role" class="input" style="width:100%;">
+          ${Object.entries(roleLabels).map(([val, label]) => `<option value="${val}" ${val === "keeper" ? "selected" : ""}>${label}</option>`).join("")}
+        </select>
+      </div>
+      <button class="btn-primary" id="nu-save">إنشاء الحساب</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#nu-close", overlay).onclick = () => overlay.remove();
+  $("#nu-save", overlay).onclick = async () => {
+    const username = $("#nu-username", overlay).value.trim().toLowerCase();
+    const fullName = $("#nu-fullname", overlay).value.trim();
+    const password = $("#nu-password", overlay).value;
+    const role = $("#nu-role", overlay).value;
+    if (!username || !/^[a-z0-9._-]+$/.test(username)) { toast("اسم المستخدم لازم يكون بالإنجليزي بدون مسافات", true); return; }
+    if (password.length < 6) { toast("كلمة المرور لازم تكون 6 أحرف على الأقل", true); return; }
+    const email = username + USERNAME_SUFFIX;
+    const btn = $("#nu-save", overlay); btn.disabled = true; btn.textContent = "...جارِ الإنشاء";
+    const res = await callManageUsers({ action: "create", email, password, fullName, role });
+    btn.disabled = false; btn.textContent = "إنشاء الحساب";
+    if (res.error) { toast(res.error, true); return; }
+    logAudit({ action: "إنشاء حساب مستخدم", entity: "user", entityName: fullName || username, details: `الدور: ${roleLabels[role]}` });
+    overlay.remove();
+    await loadProfiles(); renderUsers(main); toast(`تم إنشاء الحساب — اسم المستخدم: ${username}`);
+  };
 }
 
 /* ---------------- audit log view ---------------- */
