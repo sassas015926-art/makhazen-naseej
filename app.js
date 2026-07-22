@@ -137,12 +137,29 @@ async function tryLogin(username, password) {
   if (error) throw error;
   return data;
 }
-async function doLogout() {
+async function doLogout(reason) {
   await sb.auth.signOut();
   state.user = null; state.profile = null;
   clearInterval(state.pollTimer);
+  clearInactivityTimer();
   showLogin();
+  if (reason) { $("#login-error").textContent = reason; $("#login-error").classList.remove("hidden"); }
 }
+
+/* ---------------- تسجيل خروج تلقائي بعد عدم النشاط ---------------- */
+const INACTIVITY_LIMIT_MS = 20 * 60 * 1000; // 20 دقيقة
+let inactivityTimer = null;
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  if (!state.user) return;
+  inactivityTimer = setTimeout(() => {
+    doLogout("تم تسجيل الخروج تلقائيًا بعد فترة من عدم النشاط. سجّل دخولك مرة أخرى للمتابعة.");
+  }, INACTIVITY_LIMIT_MS);
+}
+function clearInactivityTimer() { clearTimeout(inactivityTimer); }
+["mousemove", "keydown", "click", "touchstart", "scroll"].forEach(evt => {
+  document.addEventListener(evt, () => { if (state.user) resetInactivityTimer(); }, { passive: true });
+});
 
 /* ---------------- data loading ---------------- */
 async function loadSettings() {
@@ -230,6 +247,7 @@ function showApp() {
   $("#logout-btn").textContent = t("logout");
   $$(".lang-btn").forEach(b => b.classList.toggle("active-lang", b.dataset.lang === state.lang));
   render();
+  resetInactivityTimer();
   clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
     if (document.querySelector(".modal-overlay")) return;
@@ -912,7 +930,57 @@ function openItemModal(existing, prefillName, onDone) {
   };
 }
 
-/* ---------------- boot wiring ---------------- */
+/* ---------------- تغيير كلمة المرور (ذاتيًا) ---------------- */
+function openChangePasswordModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">تغيير كلمة المرور</div>
+        <button class="close-x" id="cp-close">${icon("x", 15)}</button>
+      </div>
+      <div class="field"><label>كلمة المرور الجديدة</label><input id="cp-new" type="password" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
+      <div class="field"><label>تأكيد كلمة المرور</label><input id="cp-confirm" type="password" class="input" style="width:100%;" placeholder="أعد كتابتها"></div>
+      <button class="btn-primary" id="cp-save">حفظ كلمة المرور الجديدة</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#cp-close", overlay).onclick = () => overlay.remove();
+  $("#cp-save", overlay).onclick = async () => {
+    const p1 = $("#cp-new", overlay).value, p2 = $("#cp-confirm", overlay).value;
+    if (p1.length < 6) { toast("كلمة المرور لازم تكون 6 أحرف على الأقل", true); return; }
+    if (p1 !== p2) { toast("كلمتا المرور غير متطابقتين", true); return; }
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if (error) { toast("تعذر تغيير كلمة المرور", true); return; }
+    logAudit({ action: "تغيير كلمة المرور", entity: "user", entityName: state.profile?.full_name });
+    overlay.remove();
+    toast("تم تغيير كلمة المرور بنجاح");
+  };
+}
+
+/* ---------------- منع تسجيل الدخول المتكرر (حماية بسيطة من محاولات القوة الغاشمة) ---------------- */
+const LOGIN_LOCK_KEY = "login-lock-";
+const MAX_ATTEMPTS = 5, LOCK_MINUTES = 5;
+function getLoginLock(username) {
+  try { return JSON.parse(localStorage.getItem(LOGIN_LOCK_KEY + username) || "null"); } catch (e) { return null; }
+}
+function setLoginLock(username, data) { localStorage.setItem(LOGIN_LOCK_KEY + username, JSON.stringify(data)); }
+function checkLoginLock(username) {
+  const lock = getLoginLock(username);
+  if (lock && lock.lockUntil && Date.now() < lock.lockUntil) {
+    const mins = Math.ceil((lock.lockUntil - Date.now()) / 60000);
+    return `تم إيقاف تسجيل الدخول مؤقتًا بعد محاولات فاشلة متكررة. حاول بعد ${mins} دقيقة.`;
+  }
+  return null;
+}
+function recordLoginFailure(username) {
+  const lock = getLoginLock(username) || { count: 0 };
+  lock.count = (lock.count || 0) + 1;
+  if (lock.count >= MAX_ATTEMPTS) { lock.lockUntil = Date.now() + LOCK_MINUTES * 60000; lock.count = 0; }
+  setLoginLock(username, lock);
+}
+function clearLoginFailures(username) { localStorage.removeItem(LOGIN_LOCK_KEY + username); }
 document.addEventListener("DOMContentLoaded", () => {
   document.documentElement.dir = I18N[state.lang].dir;
   document.documentElement.lang = state.lang;
@@ -924,6 +992,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const username = $("#login-username").value.trim();
     const password = $("#login-password").value;
     $("#login-error").classList.add("hidden");
+    const lockMsg = checkLoginLock(username.toLowerCase());
+    if (lockMsg) { $("#login-error").textContent = lockMsg; $("#login-error").classList.remove("hidden"); return; }
     const btn = $("#login-submit"); btn.disabled = true; btn.textContent = t("loginLoading");
     try {
       const { user } = await tryLogin(username, password);
@@ -936,16 +1006,20 @@ document.addEventListener("DOMContentLoaded", () => {
         $("#login-error").classList.remove("hidden");
         return;
       }
+      clearLoginFailures(username.toLowerCase());
       await sb.from("profiles").update({ last_login: new Date().toISOString(), last_login_device: deviceInfo() }).eq("id", user.id);
       logAudit({ action: "تسجيل دخول", entity: "user", entityName: state.profile?.full_name || username });
       showApp();
     } catch (err) {
-      $("#login-error").textContent = t("loginError");
+      recordLoginFailure(username.toLowerCase());
+      const lockMsg2 = checkLoginLock(username.toLowerCase());
+      $("#login-error").textContent = lockMsg2 || t("loginError");
       $("#login-error").classList.remove("hidden");
     } finally {
       btn.disabled = false; btn.textContent = t("loginBtn");
     }
   });
-  $("#logout-btn").addEventListener("click", doLogout);
+  $("#logout-btn").addEventListener("click", () => doLogout());
+  $("#change-pass-btn").addEventListener("click", openChangePasswordModal);
   boot();
 });
