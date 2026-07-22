@@ -3,7 +3,7 @@
 // Project Settings > API
 // ============================================================
 const SUPABASE_URL = "https://usuwyiyagpdtmiifdemb.supabase.co";
-const SUPABASE_ANON_KEY = "ضع هنا مفتاح sb_publishable_...";
+const SUPABASE_ANON_KEY = "sb_publishable_r1j8RiNZnB30KILWz5F5bg_IQSjagkR";
 
 // اللاحقة المستخدمة لتحويل "اسم المستخدم" إلى بريد إلكتروني داخلي
 // (Supabase يتطلب صيغة بريد إلكتروني، لكن لن يتم إرسال أي رسائل فعلية)
