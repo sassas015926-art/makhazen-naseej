@@ -1,4 +1,4 @@
-/* ================= نظام إدارة مخزون الورشة — المنطق الرئيسي ================= */
+/* ================= نظام إدارة مخزون المصنع — المنطق الرئيسي ================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -31,10 +31,67 @@ const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "�
 
 const state = {
   user: null, profile: null,
-  settings: { workshop_name: "مصنع نسيج", logo_base64: null },
-  categories: [], items: [], transactions: [],
-  tab: "dashboard", selectedItem: null, pollTimer: null,
+  settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
+  categories: [], items: [], transactions: [], profiles: [], auditLog: [],
+  tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"),
 };
+
+const I18N = {
+  ar: {
+    dir: "rtl", loginTitle: "تسجيل الدخول لإدارة المخازن", loginUser: "اسم المستخدم", loginPass: "كلمة المرور",
+    loginBtn: "تسجيل الدخول", loginLoading: "...جارِ الدخول", loginError: "اسم المستخدم أو كلمة المرور غير صحيحة",
+    navDashboard: "لوحة التحكم", navIn: "إدخال مخزون", navOut: "سحب من المخزن", navStock: "المخزون الحالي",
+    navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات والأصناف",
+    logout: "خروج",
+  },
+  tr: {
+    dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
+    loginBtn: "Giriş Yap", loginLoading: "...Giriş yapılıyor", loginError: "Kullanıcı adı veya şifre hatalı",
+    navDashboard: "Kontrol Paneli", navIn: "Stok Girişi", navOut: "Depodan Çıkış", navStock: "Mevcut Stok",
+    navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar ve Ürünler",
+    logout: "Çıkış",
+  },
+};
+function t(key) { return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ar[key] || key; }
+function setLang(lang) {
+  state.lang = lang; localStorage.setItem("lang", lang);
+  document.documentElement.dir = I18N[lang].dir;
+  document.documentElement.lang = lang;
+  applyLoginTexts();
+  const logoutBtn = $("#logout-btn"); if (logoutBtn) logoutBtn.textContent = t("logout");
+  if (state.user) render();
+}
+function applyLoginTexts() {
+  const subEl = $("#login-sub"); if (subEl) subEl.textContent = t("loginTitle");
+  const uLbl = $("#login-user-label"); if (uLbl) uLbl.textContent = t("loginUser");
+  const pLbl = $("#login-pass-label"); if (pLbl) pLbl.textContent = t("loginPass");
+  const btn = $("#login-submit"); if (btn && !btn.disabled) btn.textContent = t("loginBtn");
+  $$(".lang-btn").forEach(b => b.classList.toggle("active-lang", b.dataset.lang === state.lang));
+}
+
+function myRole() { return state.profile?.role || "keeper"; }
+function isAdmin() { return myRole() === "admin"; }
+function canEdit() { return myRole() === "admin" || myRole() === "keeper"; }
+function deviceInfo() {
+  const ua = navigator.userAgent || "";
+  let dev = "جهاز غير معروف";
+  if (/Mobi|Android/i.test(ua)) dev = "موبايل";
+  else if (/Tablet|iPad/i.test(ua)) dev = "تابلت";
+  else dev = "كمبيوتر";
+  const browser = /Chrome/i.test(ua) ? "Chrome" : /Firefox/i.test(ua) ? "Firefox" : /Safari/i.test(ua) ? "Safari" : /Edg/i.test(ua) ? "Edge" : "متصفح";
+  return `${dev} · ${browser}`;
+}
+async function logAudit({ action, entity, entityName, qtyBefore, qtyAfter, details }) {
+  try {
+    await sb.from("audit_log").insert({
+      actor_id: state.user?.id || null,
+      actor_name: state.profile?.full_name || state.user?.email?.split("@")[0] || "غير معروف",
+      action, entity: entity || null, entity_name: entityName || null,
+      qty_before: qtyBefore ?? null, qty_after: qtyAfter ?? null,
+      device: deviceInfo(), details: details || null,
+    });
+  } catch (e) { /* لا نوقف العملية الأساسية لو فشل تسجيل السجل */ }
+}
 
 /* ---------------- helpers ---------------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -44,7 +101,14 @@ function fmtDate(iso) {
   return d.toLocaleString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 function pctOf(item) { if (!item.max_qty || item.max_qty <= 0) return 100; return Math.max(0, Math.min(100, (item.qty / item.max_qty) * 100)); }
-function statusOf(item) { const p = pctOf(item); if (p <= 15) return "critical"; if (p <= 30) return "warning"; return "ok"; }
+function statusOf(item) {
+  const p = pctOf(item);
+  const critT = (state.settings && state.settings.alert_threshold_percent) || 15;
+  const warnT = (state.settings && state.settings.warning_threshold_percent) || 30;
+  if (p <= critT) return "critical";
+  if (p <= warnT) return "warning";
+  return "ok";
+}
 const STATUS_META = {
   critical: { label: "حرج", cls: "pill-critical", color: "#B8433A" },
   warning: { label: "منخفض", cls: "pill-warning", color: "#C9971F" },
@@ -101,8 +165,17 @@ async function loadProfile() {
   const { data } = await sb.from("profiles").select("*").eq("id", state.user.id).maybeSingle();
   state.profile = data;
 }
+async function loadProfiles() {
+  const { data } = await sb.from("profiles").select("*").order("full_name");
+  state.profiles = data || [];
+}
+async function loadAuditLog() {
+  const { data } = await sb.from("audit_log").select("*").order("created_at", { ascending: false }).limit(300);
+  state.auditLog = data || [];
+}
 async function loadAll() {
   await Promise.all([loadSettings(), loadCategories(), loadItems(), loadTransactions(), loadProfile()]);
+  await Promise.all([loadProfiles(), loadAuditLog()]);
 }
 
 /* ---------------- app boot ---------------- */
@@ -112,7 +185,15 @@ async function boot() {
   if (session) {
     state.user = session.user;
     await loadAll();
-    showApp();
+    if (state.profile && state.profile.is_active === false) {
+      await sb.auth.signOut();
+      state.user = null; state.profile = null;
+      showLogin();
+      $("#login-error").textContent = "هذا الحساب موقوف حاليًا. تواصل مع مدير النظام.";
+      $("#login-error").classList.remove("hidden");
+    } else {
+      showApp();
+    }
   } else {
     showLogin();
   }
@@ -146,6 +227,8 @@ function showApp() {
   applyBranding();
   const wname = state.profile?.full_name || state.user.email.split("@")[0];
   $("#who-name").textContent = wname;
+  $("#logout-btn").textContent = t("logout");
+  $$(".lang-btn").forEach(b => b.classList.toggle("active-lang", b.dataset.lang === state.lang));
   render();
   clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
@@ -157,21 +240,31 @@ function showApp() {
 
 /* ---------------- nav ---------------- */
 const NAV = [
-  { id: "dashboard", label: "لوحة التحكم", icon: "grid" },
-  { id: "in", label: "إدخال مخزون", icon: "in" },
-  { id: "out", label: "سحب من المخزن", icon: "out" },
-  { id: "stock", label: "المخزون الحالي", icon: "package" },
-  { id: "reports", label: "التقارير", icon: "chart" },
-  { id: "settings", label: "الإعدادات والأصناف", icon: "gear" },
+  { id: "dashboard", labelKey: "navDashboard", icon: "grid", roles: ["admin", "keeper", "viewer"] },
+  { id: "in", labelKey: "navIn", icon: "in", roles: ["admin", "keeper"] },
+  { id: "out", labelKey: "navOut", icon: "out", roles: ["admin", "keeper"] },
+  { id: "stock", labelKey: "navStock", icon: "package", roles: ["admin", "keeper", "viewer"] },
+  { id: "reports", labelKey: "navReports", icon: "chart", roles: ["admin", "keeper", "viewer"] },
+  { id: "audit", labelKey: "navAudit", icon: "history", roles: ["admin", "keeper", "viewer"] },
+  { id: "users", labelKey: "navUsers", icon: "gear", roles: ["admin"] },
+  { id: "settings", labelKey: "navSettings", icon: "gear", roles: ["admin", "keeper"] },
 ];
 function renderNav() {
   const critical = state.items.filter(i => statusOf(i) === "critical").length;
-  $("#nav-list").innerHTML = NAV.map(n => `
+  const visible = NAV.filter(n => n.roles.includes(myRole()));
+  $("#nav-list").innerHTML = visible.map(n => `
     <button class="nav-btn ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}">
-      ${icon(n.icon, 18)}<span>${n.label}</span>
+      ${icon(n.icon, 18)}<span>${t(n.labelKey)}</span>
       ${n.id === "dashboard" && critical ? `<span class="badge">${critical}</span>` : ""}
     </button>`).join("");
-  $$(".nav-btn").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; state.selectedItem = null; render(); });
+  $$(".nav-btn").forEach(b => b.onclick = async () => {
+    state.tab = b.dataset.tab; state.selectedItem = null;
+    if (state.tab === "audit") await loadAuditLog();
+    if (state.tab === "users") await loadProfiles();
+    render();
+  });
+  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
+  const roleTag = $("#who-role"); if (roleTag) roleTag.textContent = roleLabels[myRole()] || "";
 }
 
 /* ---------------- render dispatcher ---------------- */
@@ -181,15 +274,19 @@ function render() {
   const banner = $("#alert-banner");
   if (critItems.length) {
     banner.classList.remove("hidden");
-    banner.innerHTML = `${icon("alert", 17)} تنبيه: ${critItems.length} صنف وصل إلى أقل من 15% من الحد الأقصى للمخزون — ${critItems.slice(0, 4).map(i => i.name).join("، ")}${critItems.length > 4 ? " ..." : ""}`;
+    banner.innerHTML = `${icon("alert", 17)} تنبيه: ${critItems.length} صنف وصل إلى أقل من ${state.settings.alert_threshold_percent || 15}% من الحد الأقصى للمخزون — ${critItems.slice(0, 4).map(i => i.name).join("، ")}${critItems.length > 4 ? " ..." : ""}`;
   } else banner.classList.add("hidden");
 
   const main = $("#main");
+  const allowed = NAV.find(n => n.id === state.tab);
+  if (!allowed || !allowed.roles.includes(myRole())) state.tab = "dashboard";
   if (state.tab === "dashboard") renderDashboard(main);
   else if (state.tab === "in") renderMove(main, "in");
   else if (state.tab === "out") renderMove(main, "out");
   else if (state.tab === "stock") renderStock(main);
   else if (state.tab === "reports") renderReports(main);
+  else if (state.tab === "audit") renderAudit(main);
+  else if (state.tab === "users") renderUsers(main);
   else if (state.tab === "settings") renderSettings(main);
 }
 
@@ -205,7 +302,7 @@ function renderDashboard(main) {
 
   const stats = [
     { label: "إجمالي الأصناف", value: items.length, icon: "package", color: "var(--ink)" },
-    { label: "أصناف حرجة (أقل من 15%)", value: critical.length, icon: "alert", color: "var(--red)" },
+    { label: `أصناف حرجة (أقل من ${state.settings.alert_threshold_percent || 15}%)`, value: critical.length, icon: "alert", color: "var(--red)" },
     { label: "عمليات إدخال اليوم", value: todayIn, icon: "in", color: "var(--green)" },
     { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#8A6A16" },
   ];
@@ -256,7 +353,7 @@ function renderMove(main, mode) {
   const isIn = mode === "in";
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${isIn ? "إدخال مخزون" : "سحب من المخزن"}</div>
-    <div class="section-sub">${isIn ? "أضف كمية جديدة وصلت للورشة" : "اسحب المواد التي تحتاجها للعمل مباشرة"}</div></div></div>
+    <div class="section-sub">${isIn ? "أضف كمية جديدة وصلت للمصنع" : "اسحب المواد التي تحتاجها للعمل مباشرة"}</div></div></div>
     <div id="move-body"></div>`;
   renderMoveBody(mode);
 }
@@ -272,7 +369,7 @@ function renderMoveBody(mode) {
       <div id="move-groups"></div>`;
     const renderTiles = () => {
       const q = ($("#move-search").value || "").toLowerCase();
-      const filtered = state.items.filter(i => i.name.toLowerCase().includes(q) || (i.category || "").includes(q));
+      const filtered = state.items.filter(i => i.name.toLowerCase().includes(q) || (i.category || "").includes(q) || (i.code || "").toLowerCase().includes(q));
       if (!filtered.length) {
         $("#move-groups").innerHTML = `
           <div class="empty-note">لا توجد أصناف مطابقة لـ "${$("#move-search").value}".</div>
@@ -305,7 +402,7 @@ function renderMoveBody(mode) {
 
   const sel = state.selectedItem;
   const resultQty = isIn ? sel.qty + sel.qty_input : Math.max(0, sel.qty - sel.qty_input);
-  const willCrit = sel.max_qty > 0 && (resultQty / sel.max_qty) * 100 <= 15;
+  const willCrit = sel.max_qty > 0 && (resultQty / sel.max_qty) * 100 <= (state.settings.alert_threshold_percent || 15);
   body.innerHTML = `
     <div class="card move-panel">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -322,9 +419,9 @@ function renderMoveBody(mode) {
           <span style="color:var(--ink70); font-size:13px;">${sel.unit}</span>
         </div>
       </div>
-      ${!isIn ? `<div class="field"><label>اسم العامل *</label><input id="worker-input" class="input" style="width:100%;" placeholder="مثال: أحمد محمد"></div>` : ""}
+      ${!isIn ? `<div class="field"><label>اسم العامل *</label><input id="worker-input" class="input" style="width:100%;" value="${state.profile?.full_name || ""}" placeholder="مثال: أحمد محمد"></div>` : ""}
       <div class="field"><label>ملاحظة (اختياري)</label><input id="note-input" class="input" style="width:100%;" placeholder="${isIn ? "مثال: توريد جديد من المورد" : "مثال: لتفصيلة قميص رجالي"}"></div>
-      ${willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من 15%)</div>` : ""}
+      ${willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : ""}
       <button class="btn-primary" id="move-submit" style="background:${isIn ? "var(--green)" : "var(--ink)"}; display:flex; align-items:center; justify-content:center; gap:8px;">
         ${icon(isIn ? "in" : "out", 18)} ${isIn ? "تأكيد الإدخال" : "تأكيد السحب"}
       </button>
@@ -347,6 +444,11 @@ function renderMoveBody(mode) {
     await sb.from("transactions").insert({
       item_id: sel.id, item_name: sel.name, unit: sel.unit, type: mode, qty, worker, note,
     });
+    logAudit({
+      action: isIn ? "إدخال" : "صرف", entity: "item", entityName: sel.name,
+      qtyBefore: sel.qty, qtyAfter: newQty,
+      details: worker ? `بمعرفة: ${worker}${note ? " — " + note : ""}` : (note || null),
+    });
     toast(isIn ? `تم إدخال ${qty} ${sel.unit} إلى "${sel.name}"` : `تم سحب ${qty} ${sel.unit} من "${sel.name}"`);
     state.selectedItem = null;
     await Promise.all([loadItems(), loadTransactions()]);
@@ -360,23 +462,23 @@ function renderStock(main) {
     <div class="section-header"><div><div class="section-title">المخزون الحالي</div><div class="section-sub">${state.items.length} صنف مسجّل بالمخزن</div></div></div>
     <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
       <div style="position:relative;"><span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
-        <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="ابحث عن صنف..."></div>
+        <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="ابحث بالاسم أو الكود..."></div>
       <select id="stock-cat" class="input"><option>الكل</option>${state.categories.map(c => `<option>${c}</option>`).join("")}</select>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الصنف</th><th>الفئة</th><th>الكمية</th><th>نسبة الامتلاء</th><th>الحالة</th></tr></thead><tbody id="stock-body"></tbody></table>
+      <table><thead><tr><th>الكود</th><th>الصنف</th><th>الفئة</th><th>الكمية</th><th>نسبة الامتلاء</th><th>الحالة</th></tr></thead><tbody id="stock-body"></tbody></table>
     </div>`;
   const draw = () => {
     const q = ($("#stock-search").value || "").toLowerCase();
     const cat = $("#stock-cat").value;
-    const filtered = state.items.filter(i => (cat === "الكل" || i.category === cat) && i.name.toLowerCase().includes(q));
-    if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="5"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
+    const filtered = state.items.filter(i => (cat === "الكل" || i.category === cat) && (i.name.toLowerCase().includes(q) || (i.code || "").toLowerCase().includes(q)));
+    if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="6"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
     const groups = {};
     filtered.forEach(it => { const c = it.category || "بدون فئة"; (groups[c] = groups[c] || []).push(it); });
     $("#stock-body").innerHTML = Object.entries(groups).map(([catName, catItems]) => `
-      <tr><td colspan="5" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);">${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
+      <tr><td colspan="6" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);">${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
       ${catItems.map(it => `
-        <tr><td style="font-weight:700; padding-right:26px;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td>
+        <tr><td class="mono" style="color:var(--mustard); font-weight:700;">${it.code || "—"}</td><td style="font-weight:700; padding-right:26px;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td>
         <td class="mono">${it.qty} / ${it.max_qty} ${it.unit}</td><td style="width:200px;">${tape(it, true)}</td><td>${pill(statusOf(it))}</td></tr>`).join("")}
     `).join("");
   };
@@ -397,7 +499,7 @@ function renderReports(main) {
 
     <div id="report-print-area">
       <div class="print-only print-header">
-        <div style="font-weight:800; font-size:18px;">${state.settings.workshop_name || "الورشة"} — تقرير المخزون</div>
+        <div style="font-weight:800; font-size:18px;">${state.settings.workshop_name || "مصنع نسيج"} — تقرير المخزون</div>
         <div style="font-size:12px; color:#555;">تم إنشاء التقرير في: ${genTime}</div>
       </div>
 
@@ -523,7 +625,7 @@ function renderReports(main) {
     XLSX.utils.book_append_sheet(wb, ws3, "سجل الحركات");
 
     // ورقة: معلومات التقرير
-    const ws4 = XLSX.utils.json_to_sheet([{ "الورشة": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]);
+    const ws4 = XLSX.utils.json_to_sheet([{ "المصنع": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]);
     XLSX.utils.book_append_sheet(wb, ws4, "معلومات التقرير");
 
     XLSX.writeFile(wb, `تقرير_المخزون_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -533,13 +635,14 @@ function renderReports(main) {
 /* ---------------- settings (branding + categories + items) ---------------- */
 function renderSettings(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">الإعدادات والأصناف</div><div class="section-sub">اسم الورشة، الشعار، أنواع المنتجات، وإدارة الأصناف</div></div></div>
+    <div class="section-header"><div><div class="section-title">الإعدادات والأصناف</div><div class="section-sub">اسم المصنع، الشعار، أنواع المنتجات، وإدارة الأصناف</div></div></div>
 
+    ${isAdmin() ? `
     <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">بيانات الورشة</div>
-      <div class="field"><label>اسم الورشة</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
+      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">بيانات المصنع</div>
+      <div class="field"><label>اسم المصنع</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
       <div class="field">
-        <label>شعار الورشة</label>
+        <label>شعار المصنع</label>
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="width:52px; height:52px; border-radius:12px; background:var(--mustard); display:flex; align-items:center; justify-content:center; overflow:hidden;">
             ${state.settings.logo_base64 ? `<img src="${state.settings.logo_base64}" style="width:100%; height:100%; object-fit:cover;">` : icon("scissors", 24)}
@@ -547,8 +650,19 @@ function renderSettings(main) {
           <input id="ws-logo" type="file" accept="image/*">
         </div>
       </div>
-      <button class="btn-primary" id="ws-save">حفظ بيانات الورشة</button>
-    </div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label>عنوان المصنع</label><input id="ws-address" class="input" style="width:100%;" value="${state.settings.address || ""}"></div>
+        <div class="field" style="flex:1;"><label>رقم الهاتف</label><input id="ws-phone" class="input" style="width:100%;" value="${state.settings.phone || ""}"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label>نسبة التنبيه الحرج %</label><input id="ws-crit" type="number" min="1" max="90" class="input mono" style="width:100%;" value="${state.settings.alert_threshold_percent || 15}"></div>
+        <div class="field" style="flex:1;"><label>نسبة تنبيه "منخفض" %</label><input id="ws-warn" type="number" min="1" max="95" class="input mono" style="width:100%;" value="${state.settings.warning_threshold_percent || 30}"></div>
+      </div>
+      <button class="btn-primary" id="ws-save">حفظ بيانات المصنع</button>
+    </div>` : `
+    <div class="card" style="margin-bottom:18px; max-width:480px;">
+      <div style="font-size:12.5px; color:var(--ink70);">بيانات المصنع (الاسم، الشعار، نسب التنبيه) يتحكم بيها مدير النظام فقط. تقدر تدير الفئات والأصناف تحت.</div>
+    </div>`}
 
     <div class="card" style="margin-bottom:18px; max-width:480px;">
       <div style="font-weight:800; font-size:15px; margin-bottom:14px;">أنواع المنتجات (الفئات)</div>
@@ -562,30 +676,40 @@ function renderSettings(main) {
     <div class="section-header"><div style="font-weight:800; font-size:16px;">إدارة الأصناف</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} صنف جديد</button></div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الصنف</th><th>الفئة</th><th>الوحدة</th><th>الكمية الحالية</th><th>الحد الأقصى</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
+      <table><thead><tr><th>الكود</th><th>الصنف</th><th>الفئة</th><th>الوحدة</th><th>الكمية الحالية</th><th>الحد الأقصى</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
-  // branding
-  let logoData = state.settings.logo_base64 || null;
-  $("#ws-logo").onchange = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { logoData = reader.result; toast("تم اختيار الشعار — اضغط حفظ لتأكيده"); };
-    reader.readAsDataURL(file);
-  };
-  $("#ws-save").onclick = async () => {
-    const name = $("#ws-name").value.trim() || "مصنع نسيج";
-    const { error } = await sb.from("settings").update({ workshop_name: name, logo_base64: logoData, updated_at: new Date().toISOString() }).eq("id", 1);
-    if (error) { toast("تعذر حفظ الإعدادات", true); return; }
-    await loadSettings(); applyBranding(); toast("تم حفظ بيانات الورشة");
-  };
+  // branding (admin only — القسم ده أصلًا مش ظاهر في الواجهة لغير المدير)
+  if (isAdmin()) {
+    let logoData = state.settings.logo_base64 || null;
+    $("#ws-logo").onchange = (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { logoData = reader.result; toast("تم اختيار الشعار — اضغط حفظ لتأكيده"); };
+      reader.readAsDataURL(file);
+    };
+    $("#ws-save").onclick = async () => {
+      const name = $("#ws-name").value.trim() || "مصنع نسيج";
+      const payload = {
+        workshop_name: name, logo_base64: logoData,
+        address: $("#ws-address").value.trim(), phone: $("#ws-phone").value.trim(),
+        alert_threshold_percent: Number($("#ws-crit").value) || 15,
+        warning_threshold_percent: Number($("#ws-warn").value) || 30,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await sb.from("settings").update(payload).eq("id", 1);
+      if (error) { toast("تعذر حفظ الإعدادات", true); return; }
+      await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
+    };
+  }
 
-  // categories
+  // categories (متاحة للمدير وأمين المخزن)
   const drawCats = () => {
     $("#cat-chips").innerHTML = state.categories.map(c => `<span class="chip">${c}<button data-cat="${c}">${icon("x", 12)}</button></span>`).join("");
     $$("[data-cat]").forEach(b => b.onclick = async () => {
       if (!confirm(`حذف فئة "${b.dataset.cat}"؟ (لن يتأثر الأصناف الموجودة بها)`)) return;
       await sb.from("categories").delete().eq("name", b.dataset.cat);
+      logAudit({ action: "حذف فئة", entity: "category", entityName: b.dataset.cat });
       await loadCategories(); renderSettings(main);
     });
   };
@@ -595,13 +719,14 @@ function renderSettings(main) {
     if (!val) { toast("أدخل اسم الفئة", true); return; }
     const { error } = await sb.from("categories").insert({ name: val });
     if (error) { toast("هذه الفئة موجودة بالفعل", true); return; }
+    logAudit({ action: "إضافة فئة", entity: "category", entityName: val });
     await loadCategories(); renderSettings(main); toast("تمت إضافة الفئة");
   };
 
-  // items table
+  // items table (متاحة للمدير وأمين المخزن)
   const drawItems = () => {
     $("#items-body").innerHTML = state.items.map(it => `
-      <tr><td style="font-weight:700;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
+      <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td><td style="font-weight:700;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
       <td class="mono">${it.qty}</td><td class="mono">${it.max_qty}</td>
       <td><div style="display:flex; gap:8px; justify-content:flex-end;">
         <button class="icon-btn" data-edit="${it.id}">${icon("pencil", 14)}</button>
@@ -612,6 +737,7 @@ function renderSettings(main) {
       const it = state.items.find(i => i.id === b.dataset.del);
       if (!confirm(`حذف "${it.name}" نهائيًا؟`)) return;
       await sb.from("items").delete().eq("id", it.id);
+      logAudit({ action: "حذف صنف", entity: "item", entityName: it.name });
       await loadItems(); renderSettings(main); toast("تم حذف الصنف");
     });
   };
@@ -619,10 +745,86 @@ function renderSettings(main) {
   $("#new-item-btn").onclick = () => openItemModal(null);
 }
 
+/* ---------------- user management (admin only) ---------------- */
+function renderUsers(main) {
+  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
+  main.innerHTML = `
+    <div class="section-header"><div><div class="section-title">إدارة المستخدمين</div><div class="section-sub">تحديد صلاحيات كل مستخدم، وإيقاف أو تفعيل الحسابات</div></div></div>
+    <div style="background:var(--mustard-soft); color:#8A6A16; font-size:12px; font-weight:600; padding:10px 14px; border-radius:10px; margin-bottom:16px;">
+      إنشاء حسابات الدخول (اسم المستخدم وكلمة المرور) لازم يتم من لوحة تحكم Supabase حاليًا. من هنا تقدر تتحكم في صلاحية كل حساب موجود بالفعل (مدير / أمين مخزن / قراءة فقط) وتوقف أو تفعّل أي حساب.
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table><thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th>الجهاز</th></tr></thead><tbody id="users-body"></tbody></table>
+    </div>`;
+  $("#users-body").innerHTML = state.profiles.map(p => `
+    <tr>
+      <td style="font-weight:700;">${p.full_name || "—"}${p.id === state.user.id ? ' <span style="color:var(--ink50); font-size:11px;">(أنت)</span>' : ""}</td>
+      <td>
+        <select class="input" style="padding:6px 10px; font-size:12.5px;" data-role="${p.id}" ${p.id === state.user.id ? "disabled" : ""}>
+          ${Object.entries(roleLabels).map(([val, label]) => `<option value="${val}" ${p.role === val ? "selected" : ""}>${label}</option>`).join("")}
+        </select>
+      </td>
+      <td>
+        <button data-toggle="${p.id}" ${p.id === state.user.id ? "disabled" : ""} class="pill ${p.is_active !== false ? "pill-ok" : "pill-critical"}" style="border:none; cursor:${p.id === state.user.id ? "default" : "pointer"};">
+          ${p.is_active !== false ? "نشط" : "موقوف"}
+        </button>
+      </td>
+      <td style="color:var(--ink70); font-size:12.5px;" class="mono">${p.last_login ? fmtDate(p.last_login) : "—"}</td>
+      <td style="color:var(--ink70); font-size:12.5px;">${p.last_login_device || "—"}</td>
+    </tr>`).join("");
+  $$("[data-role]").forEach(sel => sel.onchange = async () => {
+    const { error } = await sb.from("profiles").update({ role: sel.value }).eq("id", sel.dataset.role);
+    if (error) { toast("تعذر تحديث الدور — تأكد إنك مسجل بحساب مدير", true); return; }
+    const p = state.profiles.find(x => x.id === sel.dataset.role);
+    logAudit({ action: "تغيير دور مستخدم", entity: "user", entityName: p?.full_name, details: `الدور الجديد: ${roleLabels[sel.value]}` });
+    await loadProfiles(); renderUsers(main); toast("تم تحديث الدور");
+  });
+  $$("[data-toggle]").forEach(btn => btn.onclick = async () => {
+    const p = state.profiles.find(x => x.id === btn.dataset.toggle);
+    const newVal = !(p.is_active !== false);
+    const { error } = await sb.from("profiles").update({ is_active: newVal }).eq("id", p.id);
+    if (error) { toast("تعذر تحديث الحالة", true); return; }
+    logAudit({ action: newVal ? "تفعيل حساب" : "إيقاف حساب", entity: "user", entityName: p.full_name });
+    await loadProfiles(); renderUsers(main); toast(newVal ? "تم تفعيل الحساب" : "تم إيقاف الحساب");
+  });
+}
+
+/* ---------------- audit log view ---------------- */
+function renderAudit(main) {
+  main.innerHTML = `
+    <div class="section-header"><div><div class="section-title">سجل العمليات (Audit Log)</div><div class="section-sub">من قام بالعملية، وقتها، الجهاز، والكمية قبل وبعد التعديل</div></div></div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table><thead><tr><th>المستخدم</th><th>العملية</th><th>الصنف / العنصر</th><th>قبل</th><th>بعد</th><th>الجهاز</th><th>الوقت</th></tr></thead><tbody id="audit-body"></tbody></table>
+    </div>`;
+  $("#audit-body").innerHTML = state.auditLog.length ? state.auditLog.map(a => `
+    <tr>
+      <td style="font-weight:700;">${a.actor_name || "—"}</td>
+      <td>${a.action}</td>
+      <td>${a.entity_name || "—"}${a.details ? `<div style="font-size:11px; color:var(--ink50);">${a.details}</div>` : ""}</td>
+      <td class="mono">${a.qty_before ?? "—"}</td>
+      <td class="mono">${a.qty_after ?? "—"}</td>
+      <td style="color:var(--ink70); font-size:12px;">${a.device || "—"}</td>
+      <td class="mono" style="color:var(--ink70); font-size:12px;">${fmtDate(a.created_at)}</td>
+    </tr>`).join("") : `<tr><td colspan="7"><div class="empty-note">لا توجد عمليات مسجّلة بعد.</div></td></tr>`;
+}
+
+function genItemCode(category) {
+  const letters = (category || "GEN").replace(/[^a-zA-Zء-ي]/g, "");
+  let prefix = letters.slice(0, 3).toUpperCase();
+  if (!prefix || /[ء-ي]/.test(prefix)) {
+    const map = { "أ": "A", "ب": "B", "ت": "T", "خ": "K", "س": "S", "ز": "Z", "ط": "F", "إ": "E" };
+    prefix = (category || "GEN").split("").map(ch => map[ch] || "").join("").slice(0, 3).toUpperCase() || "GEN";
+  }
+  const existing = state.items.filter(i => (i.code || "").startsWith(prefix + "-"));
+  const nums = existing.map(i => parseInt((i.code || "").split("-")[1], 10)).filter(n => !isNaN(n));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `${prefix}-${String(next).padStart(4, "0")}`;
+}
 function openItemModal(existing, prefillName, onDone) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  const form = existing ? { ...existing } : { name: prefillName || "", category: state.categories[0] || "", unit: "قطعة", qty: 0, max_qty: 100 };
+  const form = existing ? { ...existing } : { name: prefillName || "", category: state.categories[0] || "", unit: "قطعة", qty: 0, max_qty: 100, code: "", barcode: "" };
+  if (!form.code) form.code = genItemCode(form.category);
   overlay.innerHTML = `
     <div class="modal-box">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -645,10 +847,31 @@ function openItemModal(existing, prefillName, onDone) {
         <div class="field" style="flex:1;"><label>الكمية الحالية</label><input id="f-qty" type="number" class="input mono" style="width:100%;" value="${form.qty}"></div>
         <div class="field" style="flex:1;"><label>الحد الأقصى للمخزون</label><input id="f-max" type="number" class="input mono" style="width:100%;" value="${form.max_qty}"></div>
       </div>
-      <div style="font-size:11.5px; color:var(--ink50); margin-bottom:12px;">* التنبيه الحرج يظهر تلقائيًا عندما تصل الكمية الحالية إلى 15% أو أقل من الحد الأقصى. يمكنك إنشاء فئة جديدة (عنوان) وتحتها أي عدد من الأصناف مباشرة من هنا.</div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label>كود الصنف</label><input id="f-code" class="input mono" style="width:100%;" value="${form.code}"></div>
+      </div>
+      <div class="field">
+        <label>الباركود (اختياري)</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="f-barcode" class="input mono" style="flex:1;" value="${form.barcode || ""}" placeholder="اضغط توليد أو اكتب رقمًا يدويًا">
+          <button type="button" id="f-barcode-gen" class="step-btn" style="width:auto; padding:0 12px; font-size:12px;">توليد</button>
+        </div>
+        <div id="barcode-preview" style="margin-top:8px; background:#fff; padding:6px; border-radius:8px; border:1px solid var(--ink12); text-align:center;"></div>
+      </div>
+      <div style="font-size:11.5px; color:var(--ink50); margin-bottom:12px;">* التنبيه الحرج يظهر تلقائيًا حسب النسبة المحددة بالإعدادات. يمكنك إنشاء فئة جديدة (عنوان) وتحتها أي عدد من الأصناف مباشرة من هنا. الإدخال والسحب اليدوي يبقى شغالًا دايمًا حتى مع استخدام الباركود.</div>
       <button class="btn-primary" id="f-save">${existing ? "حفظ التعديلات" : "إضافة الصنف"}</button>
     </div>`;
   document.body.appendChild(overlay);
+  const drawBarcode = () => {
+    const val = $("#f-barcode", overlay).value.trim();
+    const prev = $("#barcode-preview", overlay);
+    if (!val || typeof JsBarcode === "undefined") { prev.innerHTML = ""; return; }
+    prev.innerHTML = `<svg id="bc-svg"></svg>`;
+    try { JsBarcode("#bc-svg", val, { height: 40, fontSize: 12, margin: 4 }); } catch (e) { prev.innerHTML = `<span style="font-size:11px; color:var(--ink50);">قيمة غير صالحة للباركود</span>`; }
+  };
+  $("#f-barcode-gen", overlay).onclick = () => { $("#f-barcode", overlay).value = $("#f-code", overlay).value || genItemCode($("#f-cat", overlay).value); drawBarcode(); };
+  $("#f-barcode", overlay).oninput = drawBarcode;
+  drawBarcode();
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   $("#modal-close", overlay).onclick = () => overlay.remove();
   $("#f-cat", overlay).onchange = (e) => {
@@ -669,13 +892,19 @@ function openItemModal(existing, prefillName, onDone) {
       unit: $("#f-unit", overlay).value.trim() || "قطعة",
       qty: Number($("#f-qty", overlay).value) || 0,
       max_qty: Number($("#f-max", overlay).value) || 0,
+      code: $("#f-code", overlay).value.trim() || null,
+      barcode: $("#f-barcode", overlay).value.trim() || null,
     };
     if (!payload.name) { toast("أدخل اسم الصنف", true); return; }
     if (!payload.max_qty || payload.max_qty <= 0) { toast("أدخل الحد الأقصى للمخزون", true); return; }
     let error;
     if (existing) ({ error } = await sb.from("items").update(payload).eq("id", existing.id));
     else ({ error } = await sb.from("items").insert(payload));
-    if (error) { toast("تعذر حفظ الصنف", true); return; }
+    if (error) { toast(error.message.includes("duplicate") ? "هذا الكود مستخدم بالفعل لصنف آخر" : "تعذر حفظ الصنف", true); return; }
+    logAudit({
+      action: existing ? "تعديل صنف" : "إضافة صنف", entity: "item", entityName: payload.name,
+      qtyBefore: existing ? existing.qty : null, qtyAfter: payload.qty,
+    });
     overlay.remove();
     await loadItems();
     if (typeof onDone === "function") onDone(); else render();
@@ -685,22 +914,36 @@ function openItemModal(existing, prefillName, onDone) {
 
 /* ---------------- boot wiring ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
+  document.documentElement.dir = I18N[state.lang].dir;
+  document.documentElement.lang = state.lang;
+  applyLoginTexts();
+  $$(".lang-btn").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+
   $("#login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const username = $("#login-username").value.trim();
     const password = $("#login-password").value;
     $("#login-error").classList.add("hidden");
-    const btn = $("#login-submit"); btn.disabled = true; btn.textContent = "...جارِ الدخول";
+    const btn = $("#login-submit"); btn.disabled = true; btn.textContent = t("loginLoading");
     try {
       const { user } = await tryLogin(username, password);
       state.user = user;
       await loadAll();
+      if (state.profile && state.profile.is_active === false) {
+        await sb.auth.signOut();
+        state.user = null; state.profile = null;
+        $("#login-error").textContent = "هذا الحساب موقوف حاليًا. تواصل مع مدير النظام.";
+        $("#login-error").classList.remove("hidden");
+        return;
+      }
+      await sb.from("profiles").update({ last_login: new Date().toISOString(), last_login_device: deviceInfo() }).eq("id", user.id);
+      logAudit({ action: "تسجيل دخول", entity: "user", entityName: state.profile?.full_name || username });
       showApp();
     } catch (err) {
-      $("#login-error").textContent = "اسم المستخدم أو كلمة المرور غير صحيحة";
+      $("#login-error").textContent = t("loginError");
       $("#login-error").classList.remove("hidden");
     } finally {
-      btn.disabled = false; btn.textContent = "تسجيل الدخول";
+      btn.disabled = false; btn.textContent = t("loginBtn");
     }
   });
   $("#logout-btn").addEventListener("click", doLogout);
