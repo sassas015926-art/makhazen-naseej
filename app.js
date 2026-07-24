@@ -134,9 +134,9 @@ function statusOf(item) {
   return "ok";
 }
 const STATUS_META = {
-  critical: { label: "حرج", cls: "pill-critical", color: "#D9695D" },
-  warning: { label: "منخفض", cls: "pill-warning", color: "#C98A2E" },
-  ok: { label: "جيد", cls: "pill-ok", color: "#3FA66B" },
+  critical: { label: "حرج", cls: "pill-critical", color: "#C85D51" },
+  warning: { label: "منخفض", cls: "pill-warning", color: "#B87A28" },
+  ok: { label: "جيد", cls: "pill-ok", color: "#2F8F5B" },
 };
 function pill(status) {
   const m = STATUS_META[status];
@@ -346,7 +346,7 @@ function renderDashboard(main) {
     { label: "إجمالي الأصناف", value: items.length, icon: "package", color: "var(--ink)" },
     { label: `أصناف حرجة (أقل من ${state.settings.alert_threshold_percent || 15}%)`, value: critical.length, icon: "alert", color: "var(--red)" },
     { label: "عمليات إدخال اليوم", value: todayIn, icon: "in", color: "var(--green)" },
-    { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#C98A2E" },
+    { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#B87A28" },
   ];
 
   main.innerHTML = `
@@ -539,38 +539,63 @@ function renderReports(main) {
       </div>
     </div>
 
+    <div class="card no-print" style="margin-bottom:18px;">
+      <div style="font-weight:800; font-size:14px; margin-bottom:12px;">أقسام التقرير المطلوب طباعتها/تصديرها</div>
+      <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-lowstock" checked> الأصناف المنخفضة والحرجة</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-consumption" checked> الأكثر سحبًا</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-daily" checked> الملخص اليومي</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-txlog" checked> سجل الحركات التفصيلي</label>
+      </div>
+      <div style="font-weight:800; font-size:14px; margin-bottom:10px;">فلترة سجل الحركات (بتتحكم في الطباعة والتصدير كمان)</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:end;">
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">فترة سريعة</label>
+          <select id="range-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
+            <option value="all">كل الفترات</option><option value="today">اليوم</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option>
+          </select>
+        </div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">من تاريخ</label><input type="date" id="date-from" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">إلى تاريخ</label><input type="date" id="date-to" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">النوع</label>
+          <select id="type-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
+            <option value="all">الكل</option><option value="in">إدخال فقط</option><option value="out">سحب فقط</option>
+          </select>
+        </div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">الصنف</label>
+          <select id="item-filter" class="input" style="font-size:12.5px; padding:7px 10px; max-width:180px;">
+            <option value="all">كل الأصناف</option>
+            ${[...new Set(state.items.map(i => i.name))].sort().map(n => `<option value="${n}">${n}</option>`).join("")}
+          </select>
+        </div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">العامل</label><input id="worker-filter" class="input" style="font-size:12.5px; padding:7px 10px; width:120px;" placeholder="اسم العامل"></div>
+        <button class="btn-dark" id="clear-filters" style="padding:7px 12px; font-size:12.5px;">مسح الفلاتر</button>
+      </div>
+    </div>
+
     <div id="report-print-area">
       <div class="print-only print-header">
         <div style="font-weight:800; font-size:18px;">${state.settings.workshop_name || "مصنع نسيج"} — تقرير المخزون</div>
         <div style="font-size:12px; color:#555;">تم إنشاء التقرير في: ${genTime}</div>
       </div>
 
-      <div class="card" style="margin-bottom:18px;">
+      <div class="card" id="section-lowstock" style="margin-bottom:18px;">
         <div style="font-weight:800; font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:7px;">${icon("alert", 16)} تقرير الأصناف المنخفضة والحرجة</div>
         <div id="low-stock-list"></div>
       </div>
 
-      <div class="card" style="margin-bottom:18px;">
+      <div class="card" id="section-consumption" style="margin-bottom:18px;">
         <div style="font-weight:800; font-size:15px; margin-bottom:14px;">الأصناف الأكثر سحبًا (إجمالي الاستهلاك)</div>
         <div id="consumption-list"></div>
       </div>
 
-      <div class="card" style="margin-bottom:18px;">
+      <div class="card" id="section-daily" style="margin-bottom:18px;">
         <div style="font-weight:800; font-size:15px; margin-bottom:14px;">الملخص اليومي (الإدخال والسحب لكل يوم)</div>
         <div style="overflow:auto;"><table><thead><tr><th>اليوم</th><th>عدد عمليات الإدخال</th><th>إجمالي الكمية المُدخلة</th><th>عدد عمليات السحب</th><th>إجمالي الكمية المسحوبة</th></tr></thead><tbody id="daily-body"></tbody></table></div>
       </div>
 
-      <div class="card">
+      <div class="card" id="section-txlog">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-          <div style="font-weight:800; font-size:15px; display:flex; align-items:center; gap:7px;">${icon("history", 16)} سجل جميع الحركات (بالتاريخ والساعة)</div>
-          <div class="no-print" style="display:flex; gap:8px;">
-            <select id="range-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
-              <option value="all">كل الفترات</option><option value="today">اليوم</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option>
-            </select>
-            <select id="type-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
-              <option value="all">الكل</option><option value="in">إدخال فقط</option><option value="out">سحب فقط</option>
-            </select>
-          </div>
+          <div style="font-weight:800; font-size:15px; display:flex; align-items:center; gap:7px;">${icon("history", 16)} سجل الحركات (بالتاريخ والساعة) — <span id="tx-count" class="mono" style="font-weight:600; color:var(--ink70); font-size:12.5px;"></span></div>
         </div>
         <div style="max-height:340px; overflow:auto;" class="print-scroll">
           <table><thead><tr><th>الصنف</th><th>النوع</th><th>الكمية</th><th>العامل</th><th>ملاحظة</th><th>التاريخ والساعة</th></tr></thead><tbody id="tx-body"></tbody></table>
@@ -594,7 +619,7 @@ function renderReports(main) {
 
   const lowStock = state.items.filter(i => statusOf(i) !== "ok").sort((a, b) => pctOf(a) - pctOf(b));
   $("#low-stock-list").innerHTML = lowStock.length ? lowStock.map(it => `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:9px;">
+    <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:9px;">
       <div style="width:160px; font-size:13.3px; font-weight:700;">${it.name}</div>
       <div style="flex:1;">${tape(it, true)}</div>
       <div class="mono" style="width:110px; font-size:12px; color:var(--ink70);">${Math.round(pctOf(it))}% (${it.qty}/${it.max_qty})</div>
@@ -606,7 +631,7 @@ function renderReports(main) {
   const cons = Object.entries(consMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const maxCons = Math.max(1, ...cons.map(c => c[1]));
   $("#consumption-list").innerHTML = cons.length ? cons.map(([name, val]) => `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+    <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
       <div style="width:160px; font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
       <div style="flex:1; background:var(--paper-deep); border-radius:8px; height:16px; position:relative; overflow:hidden;">
         <div style="position:absolute; inset:0; width:${(val / maxCons) * 100}%; background:var(--mustard); border-radius:8px;"></div>
@@ -616,13 +641,29 @@ function renderReports(main) {
 
   const drawTx = () => {
     const range = $("#range-filter").value, type = $("#type-filter").value;
-    let cutoff = null;
-    const d = new Date();
-    if (range === "today") d.setHours(0, 0, 0, 0);
-    else if (range === "week") d.setDate(d.getDate() - 7);
-    else if (range === "month") d.setMonth(d.getMonth() - 1);
-    if (range !== "all") cutoff = d;
-    const filtered = state.transactions.filter(t => (!cutoff || new Date(t.created_at) >= cutoff) && (type === "all" || t.type === type));
+    const itemFilter = $("#item-filter").value, workerFilter = ($("#worker-filter").value || "").trim().toLowerCase();
+    const fromVal = $("#date-from").value, toVal = $("#date-to").value;
+    let cutoffFrom = null, cutoffTo = null;
+    if (fromVal || toVal) {
+      if (fromVal) cutoffFrom = new Date(fromVal + "T00:00:00");
+      if (toVal) cutoffTo = new Date(toVal + "T23:59:59");
+    } else if (range !== "all") {
+      const d = new Date();
+      if (range === "today") d.setHours(0, 0, 0, 0);
+      else if (range === "week") d.setDate(d.getDate() - 7);
+      else if (range === "month") d.setMonth(d.getMonth() - 1);
+      cutoffFrom = d;
+    }
+    const filtered = state.transactions.filter(t => {
+      const dt = new Date(t.created_at);
+      if (cutoffFrom && dt < cutoffFrom) return false;
+      if (cutoffTo && dt > cutoffTo) return false;
+      if (type !== "all" && t.type !== type) return false;
+      if (itemFilter !== "all" && t.item_name !== itemFilter) return false;
+      if (workerFilter && !(t.worker || "").toLowerCase().includes(workerFilter)) return false;
+      return true;
+    });
+    $("#tx-count").textContent = `${filtered.length} حركة`;
     $("#tx-body").innerHTML = filtered.length ? filtered.map(t => `
       <tr><td style="font-weight:700;">${t.item_name}</td>
       <td>${t.type === "in" ? '<span style="color:var(--green); font-weight:700;">إدخال</span>' : '<span style="color:var(--red); font-weight:700;">سحب</span>'}</td>
@@ -631,10 +672,24 @@ function renderReports(main) {
     return filtered;
   };
   let currentFiltered = drawTx();
-  $("#range-filter").onchange = () => { currentFiltered = drawTx(); };
-  $("#type-filter").onchange = () => { currentFiltered = drawTx(); };
+  ["range-filter", "type-filter", "item-filter"].forEach(id => $(`#${id}`).onchange = () => { currentFiltered = drawTx(); });
+  ["date-from", "date-to"].forEach(id => $(`#${id}`).onchange = () => { $("#range-filter").value = "all"; currentFiltered = drawTx(); });
+  $("#worker-filter").oninput = () => { currentFiltered = drawTx(); };
+  $("#clear-filters").onclick = () => {
+    $("#range-filter").value = "all"; $("#type-filter").value = "all"; $("#item-filter").value = "all";
+    $("#date-from").value = ""; $("#date-to").value = ""; $("#worker-filter").value = "";
+    currentFiltered = drawTx();
+  };
 
-  $("#print-report").onclick = () => window.print();
+  $("#print-report").onclick = () => {
+    const sections = { lowstock: "inc-lowstock", consumption: "inc-consumption", daily: "inc-daily", txlog: "inc-txlog" };
+    Object.entries(sections).forEach(([key, chkId]) => {
+      const el = $(`#section-${key}`);
+      el.classList.toggle("print-exclude", !$(`#${chkId}`).checked);
+    });
+    window.print();
+  };
+  window.addEventListener("afterprint", () => $$(".print-exclude").forEach(el => el.classList.remove("print-exclude")), { once: true });
 
   $("#export-excel").onclick = () => {
     const genTime2 = fmtDate(new Date().toISOString());
