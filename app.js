@@ -44,6 +44,31 @@ const I18N = {
     navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات",
     navItems: "إدارة الأصناف",
     logout: "خروج",
+    // عام
+    save: "حفظ", add: "إضافة", delete: "حذف", edit: "تعديل", cancel: "إلغاء", search: "بحث", confirmBtn: "تأكيد",
+    print: "طباعة / PDF", exportExcelBtn: "تصدير Excel", all: "الكل", unit: "الوحدة", category: "الفئة",
+    quantity: "الكمية", status: "الحالة", code: "الكود", itemName: "الصنف", worker: "العامل", note: "ملاحظة",
+    date: "التاريخ", dateTime: "التاريخ والساعة",
+    statusCritical: "حرج", statusWarning: "منخفض", statusOk: "جيد",
+    // لوحة التحكم
+    dashboardTitle: "لوحة التحكم", dashboardSub: "نظرة سريعة على حالة المخزن اليوم",
+    statTotalItems: "إجمالي الأصناف", statCritical: "أصناف حرجة", statTodayIn: "عمليات إدخال اليوم", statTodayOut: "عمليات سحب اليوم",
+    sectionUrgent: "أصناف تحتاج انتباه فوري", sectionRecentTx: "آخر الحركات",
+    viewAllStock: "عرض كل المخزون", allReports: "كل التقارير", noLowStock: "لا توجد أصناف منخفضة حاليًا.", noTx: "لا توجد حركات مسجّلة بعد.",
+    // المخزون
+    stockTitle: "المخزون الحالي", itemsRegistered: "صنف مسجّل بالمخزن", searchByNameCode: "ابحث بالاسم أو الكود...",
+    // الإدخال/السحب
+    inTitle: "إدخال مخزون", inSub: "أضف كمية جديدة وصلت للمصنع",
+    outTitle: "سحب من المخزن", outSub: "اسحب المواد التي تحتاجها للعمل مباشرة",
+    searchItem: "ابحث عن الصنف بالاسم أو الفئة...", confirmIn: "تأكيد الإدخال", confirmOut: "تأكيد السحب",
+    qtyLabel: "الكمية", workerLabel: "اسم العامل *", noteLabel: "ملاحظة (اختياري)", available: "المتوفر حاليًا",
+    // التقارير
+    reportsTitle: "التقارير", reportsSub: "تغطية كاملة لحركة المخزن والأصناف المنخفضة",
+    lowStockSection: "تقرير الأصناف المنخفضة والحرجة", consumptionSection: "الأصناف الأكثر سحبًا (إجمالي الاستهلاك)",
+    dailySection: "الملخص اليومي (الإدخال والسحب لكل يوم)", txLogSection: "سجل الحركات (بالتاريخ والساعة)",
+    printSectionsTitle: "أقسام التقرير المطلوب طباعتها/تصديرها", quickRange: "فترة سريعة", dateFrom: "من تاريخ", dateTo: "إلى تاريخ",
+    typeAll: "الكل", typeIn: "إدخال فقط", typeOut: "سحب فقط", allItems: "كل الأصناف", clearFilters: "مسح الفلاتر",
+    voucherBtn: "طباعة إذن",
   },
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
@@ -52,6 +77,31 @@ const I18N = {
     navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar",
     navItems: "Ürün Yönetimi",
     logout: "Çıkış",
+    // genel
+    save: "Kaydet", add: "Ekle", delete: "Sil", edit: "Düzenle", cancel: "İptal", search: "Ara", confirmBtn: "Onayla",
+    print: "Yazdır / PDF", exportExcelBtn: "Excel'e Aktar", all: "Tümü", unit: "Birim", category: "Kategori",
+    quantity: "Miktar", status: "Durum", code: "Kod", itemName: "Ürün", worker: "Çalışan", note: "Not",
+    date: "Tarih", dateTime: "Tarih ve Saat",
+    statusCritical: "Kritik", statusWarning: "Düşük", statusOk: "İyi",
+    // Kontrol paneli
+    dashboardTitle: "Kontrol Paneli", dashboardSub: "Bugünkü depo durumuna hızlı bakış",
+    statTotalItems: "Toplam Ürün", statCritical: "Kritik Ürünler", statTodayIn: "Bugünkü Girişler", statTodayOut: "Bugünkü Çıkışlar",
+    sectionUrgent: "Acil Dikkat Gereken Ürünler", sectionRecentTx: "Son Hareketler",
+    viewAllStock: "Tüm Stoku Görüntüle", allReports: "Tüm Raporlar", noLowStock: "Şu anda düşük stoklu ürün yok.", noTx: "Henüz kayıtlı hareket yok.",
+    // Stok
+    stockTitle: "Mevcut Stok", itemsRegistered: "kayıtlı ürün", searchByNameCode: "İsim veya kod ile ara...",
+    // Giriş/Çıkış
+    inTitle: "Stok Girişi", inSub: "Fabrikaya yeni gelen miktarı ekle",
+    outTitle: "Depodan Çıkış", outSub: "İhtiyacın olan malzemeyi doğrudan çek",
+    searchItem: "İsim veya kategoriye göre ürün ara...", confirmIn: "Girişi Onayla", confirmOut: "Çıkışı Onayla",
+    qtyLabel: "Miktar", workerLabel: "Çalışan Adı *", noteLabel: "Not (isteğe bağlı)", available: "Mevcut miktar",
+    // Raporlar
+    reportsTitle: "Raporlar", reportsSub: "Depo hareketlerinin ve düşük stokların tam kapsamı",
+    lowStockSection: "Düşük ve Kritik Stok Raporu", consumptionSection: "En Çok Çekilen Ürünler (Toplam Tüketim)",
+    dailySection: "Günlük Özet (Her Gün Giriş ve Çıkış)", txLogSection: "Hareket Kaydı (Tarih ve Saat ile)",
+    printSectionsTitle: "Yazdırılacak/Aktarılacak Rapor Bölümleri", quickRange: "Hızlı Aralık", dateFrom: "Başlangıç Tarihi", dateTo: "Bitiş Tarihi",
+    typeAll: "Tümü", typeIn: "Sadece Giriş", typeOut: "Sadece Çıkış", allItems: "Tüm Ürünler", clearFilters: "Filtreleri Temizle",
+    voucherBtn: "Fiş Yazdır",
   },
 };
 function t(key) { return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ar[key] || key; }
@@ -343,24 +393,24 @@ function renderDashboard(main) {
   const todayOut = todayTx.filter(t => t.type === "out").length;
 
   const stats = [
-    { label: "إجمالي الأصناف", value: items.length, icon: "package", color: "var(--ink)" },
-    { label: `أصناف حرجة (أقل من ${state.settings.alert_threshold_percent || 15}%)`, value: critical.length, icon: "alert", color: "var(--red)" },
-    { label: "عمليات إدخال اليوم", value: todayIn, icon: "in", color: "var(--green)" },
-    { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#B87A28" },
+    { label: t("statTotalItems"), value: items.length, icon: "package", color: "var(--ink)" },
+    { label: `${t("statCritical")} (< ${state.settings.alert_threshold_percent || 15}%)`, value: critical.length, icon: "alert", color: "var(--red)" },
+    { label: t("statTodayIn"), value: todayIn, icon: "in", color: "var(--green)" },
+    { label: t("statTodayOut"), value: todayOut, icon: "out", color: "#B87A28" },
   ];
 
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">لوحة التحكم</div><div class="section-sub">نظرة سريعة على حالة المخزن اليوم</div></div></div>
+    <div class="section-header"><div><div class="section-title">${t("dashboardTitle")}</div><div class="section-sub">${t("dashboardSub")}</div></div></div>
     <div class="stats-grid">
       ${stats.map(s => `<div class="card"><div style="color:${s.color}">${icon(s.icon, 20)}</div><div class="stat-value" style="color:${s.color}">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}
     </div>
     <div style="display:grid; grid-template-columns:1.3fr 1fr; gap:16px;">
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <div style="font-weight:800; font-size:15px;">أصناف تحتاج انتباه فوري</div>
-          <button class="link-btn" data-goto="stock">عرض كل المخزون</button>
+          <div style="font-weight:800; font-size:15px;">${t("sectionUrgent")}</div>
+          <button class="link-btn" data-goto="stock">${t("viewAllStock")}</button>
         </div>
-        ${critical.length === 0 && warning.length === 0 ? `<div class="empty-note">لا توجد أصناف منخفضة حاليًا — كل شيء ضمن الحدود الآمنة.</div>` :
+        ${critical.length === 0 && warning.length === 0 ? `<div class="empty-note">${t("noLowStock")}</div>` :
       `<div style="display:flex; flex-direction:column; gap:10px;">
           ${[...critical, ...warning].slice(0, 7).map(it => `
             <div style="display:flex; align-items:center; gap:12px;">
@@ -373,10 +423,10 @@ function renderDashboard(main) {
       </div>
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <div style="font-weight:800; font-size:15px;">آخر الحركات</div>
-          <button class="link-btn" data-goto="reports">كل التقارير</button>
+          <div style="font-weight:800; font-size:15px;">${t("sectionRecentTx")}</div>
+          <button class="link-btn" data-goto="reports">${t("allReports")}</button>
         </div>
-        ${tx.length === 0 ? `<div class="empty-note">لا توجد حركات مسجّلة بعد.</div>` :
+        ${tx.length === 0 ? `<div class="empty-note">${t("noTx")}</div>` :
       `<div style="display:flex; flex-direction:column; gap:9px;">
           ${tx.slice(0, 8).map(t => `
             <div style="display:flex; align-items:center; gap:9px; font-size:12.8px;">
@@ -394,8 +444,8 @@ function renderDashboard(main) {
 function renderMove(main, mode) {
   const isIn = mode === "in";
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">${isIn ? "إدخال مخزون" : "سحب من المخزن"}</div>
-    <div class="section-sub">${isIn ? "أضف كمية جديدة وصلت للمصنع" : "اسحب المواد التي تحتاجها للعمل مباشرة"}</div></div></div>
+    <div class="section-header"><div><div class="section-title">${isIn ? t("inTitle") : t("outTitle")}</div>
+    <div class="section-sub">${isIn ? t("inSub") : t("outSub")}</div></div></div>
     <div id="move-body"></div>`;
   renderMoveBody(mode);
 }
@@ -406,7 +456,7 @@ function renderMoveBody(mode) {
     body.innerHTML = `
       <div style="position:relative; margin-bottom:16px; max-width:420px;">
         <span style="position:absolute; right:14px; top:11px; color:var(--ink50);">${icon("search", 16)}</span>
-        <input id="move-search" class="input" style="width:100%; padding-right:38px;" placeholder="ابحث عن الصنف بالاسم أو الفئة...">
+        <input id="move-search" class="input" style="width:100%; padding-right:38px;" placeholder="${t("searchItem")}">
       </div>
       <div id="move-groups"></div>`;
     const renderTiles = () => {
@@ -448,12 +498,12 @@ function renderMoveBody(mode) {
   body.innerHTML = `
     <div class="card move-panel">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <div><div style="font-weight:800; font-size:17px;">${sel.name}</div><div style="font-size:12.5px; color:var(--ink70);">${sel.category || "—"} · المتوفر حاليًا: ${sel.qty} ${sel.unit}</div></div>
+        <div><div style="font-weight:800; font-size:17px;">${sel.name}</div><div style="font-size:12.5px; color:var(--ink70);">${sel.category || "—"} · ${t("available")}: ${sel.qty} ${sel.unit}</div></div>
         <button class="close-x" id="move-cancel">${icon("x", 16)}</button>
       </div>
       ${tape(sel)}
       <div style="margin:18px 0;">
-        <label style="display:block; font-size:12.5px; font-weight:700; color:var(--ink70); margin-bottom:6px;">الكمية</label>
+        <label style="display:block; font-size:12.5px; font-weight:700; color:var(--ink70); margin-bottom:6px;">${t("qtyLabel")}</label>
         <div class="step-row">
           <button class="step-btn" id="qty-minus">${icon("minus", 16)}</button>
           <input id="qty-input" type="number" min="1" value="${sel.qty_input}" class="input mono" style="width:90px; text-align:center;">
@@ -461,11 +511,11 @@ function renderMoveBody(mode) {
           <span style="color:var(--ink70); font-size:13px;">${sel.unit}</span>
         </div>
       </div>
-      ${!isIn ? `<div class="field"><label>اسم العامل *</label><input id="worker-input" class="input" style="width:100%;" value="${state.profile?.full_name || ""}" placeholder="مثال: أحمد محمد"></div>` : ""}
-      <div class="field"><label>ملاحظة (اختياري)</label><input id="note-input" class="input" style="width:100%;" placeholder="${isIn ? "مثال: توريد جديد من المورد" : "مثال: لتفصيلة قميص رجالي"}"></div>
+      ${!isIn ? `<div class="field"><label>${t("workerLabel")}</label><input id="worker-input" class="input" style="width:100%;" value="${state.profile?.full_name || ""}" placeholder="مثال: أحمد محمد"></div>` : ""}
+      <div class="field"><label>${t("noteLabel")}</label><input id="note-input" class="input" style="width:100%;" placeholder="${isIn ? "مثال: توريد جديد من المورد" : "مثال: لتفصيلة قميص رجالي"}"></div>
       ${willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : ""}
       <button class="btn-primary" id="move-submit" style="background:${isIn ? "var(--green)" : "var(--ink)"}; display:flex; align-items:center; justify-content:center; gap:8px;">
-        ${icon(isIn ? "in" : "out", 18)} ${isIn ? "تأكيد الإدخال" : "تأكيد السحب"}
+        ${icon(isIn ? "in" : "out", 18)} ${isIn ? t("confirmIn") : t("confirmOut")}
       </button>
     </div>`;
 
@@ -501,19 +551,19 @@ function renderMoveBody(mode) {
 /* ---------------- stock table ---------------- */
 function renderStock(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">المخزون الحالي</div><div class="section-sub">${state.items.length} صنف مسجّل بالمخزن</div></div></div>
+    <div class="section-header"><div><div class="section-title">${t("stockTitle")}</div><div class="section-sub">${state.items.length} ${t("itemsRegistered")}</div></div></div>
     <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
       <div style="position:relative;"><span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
-        <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="ابحث بالاسم أو الكود..."></div>
-      <select id="stock-cat" class="input"><option>الكل</option>${state.categories.map(c => `<option>${c}</option>`).join("")}</select>
+        <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="${t("searchByNameCode")}"></div>
+      <select id="stock-cat" class="input"><option value="__all__">${t("all")}</option>${state.categories.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الكود</th><th>الصنف</th><th>الفئة</th><th>الكمية</th><th>نسبة الامتلاء</th><th>الحالة</th></tr></thead><tbody id="stock-body"></tbody></table>
+      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("quantity")}</th><th>%</th><th>${t("status")}</th></tr></thead><tbody id="stock-body"></tbody></table>
     </div>`;
   const draw = () => {
     const q = ($("#stock-search").value || "").toLowerCase();
     const cat = $("#stock-cat").value;
-    const filtered = state.items.filter(i => (cat === "الكل" || i.category === cat) && (i.name.toLowerCase().includes(q) || (i.code || "").toLowerCase().includes(q)));
+    const filtered = state.items.filter(i => (cat === "__all__" || i.category === cat) && (i.name.toLowerCase().includes(q) || (i.code || "").toLowerCase().includes(q)));
     if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="6"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
     const groups = {};
     filtered.forEach(it => { const c = it.category || "بدون فئة"; (groups[c] = groups[c] || []).push(it); });
@@ -532,43 +582,42 @@ function renderReports(main) {
   const genTime = fmtDate(new Date().toISOString());
   main.innerHTML = `
     <div class="section-header no-print">
-      <div><div class="section-title">التقارير</div><div class="section-sub">تغطية كاملة لحركة المخزن والأصناف المنخفضة</div></div>
+      <div><div class="section-title">${t("reportsTitle")}</div><div class="section-sub">${t("reportsSub")}</div></div>
       <div style="display:flex; gap:8px;">
-        <button class="btn-dark" id="print-report">${icon("history", 14)} طباعة / PDF</button>
-        <button class="btn-dark" id="export-excel">${icon("download", 14)} تصدير Excel</button>
+        <button class="btn-dark" id="print-report">${icon("history", 14)} ${t("print")}</button>
+        <button class="btn-dark" id="export-excel">${icon("download", 14)} ${t("exportExcelBtn")}</button>
       </div>
     </div>
 
     <div class="card no-print" style="margin-bottom:18px;">
-      <div style="font-weight:800; font-size:14px; margin-bottom:12px;">أقسام التقرير المطلوب طباعتها/تصديرها</div>
+      <div style="font-weight:800; font-size:14px; margin-bottom:12px;">${t("printSectionsTitle")}</div>
       <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-lowstock" checked> الأصناف المنخفضة والحرجة</label>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-consumption" checked> الأكثر سحبًا</label>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-daily" checked> الملخص اليومي</label>
-        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-txlog" checked> سجل الحركات التفصيلي</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-lowstock" checked> ${t("lowStockSection")}</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-consumption" checked> ${t("consumptionSection")}</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-daily" checked> ${t("dailySection")}</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-txlog" checked> ${t("txLogSection")}</label>
       </div>
-      <div style="font-weight:800; font-size:14px; margin-bottom:10px;">فلترة سجل الحركات (بتتحكم في الطباعة والتصدير كمان)</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:end;">
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">فترة سريعة</label>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("quickRange")}</label>
           <select id="range-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
-            <option value="all">كل الفترات</option><option value="today">اليوم</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option>
+            <option value="all">${t("all")}</option><option value="today">اليوم</option><option value="week">آخر أسبوع</option><option value="month">آخر شهر</option>
           </select>
         </div>
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">من تاريخ</label><input type="date" id="date-from" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">إلى تاريخ</label><input type="date" id="date-to" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">النوع</label>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("dateFrom")}</label><input type="date" id="date-from" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("dateTo")}</label><input type="date" id="date-to" class="input" style="font-size:12.5px; padding:7px 10px;"></div>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("status")}</label>
           <select id="type-filter" class="input" style="font-size:12.5px; padding:7px 10px;">
-            <option value="all">الكل</option><option value="in">إدخال فقط</option><option value="out">سحب فقط</option>
+            <option value="all">${t("typeAll")}</option><option value="in">${t("typeIn")}</option><option value="out">${t("typeOut")}</option>
           </select>
         </div>
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">الصنف</label>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("itemName")}</label>
           <select id="item-filter" class="input" style="font-size:12.5px; padding:7px 10px; max-width:180px;">
-            <option value="all">كل الأصناف</option>
+            <option value="all">${t("allItems")}</option>
             ${[...new Set(state.items.map(i => i.name))].sort().map(n => `<option value="${n}">${n}</option>`).join("")}
           </select>
         </div>
-        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">العامل</label><input id="worker-filter" class="input" style="font-size:12.5px; padding:7px 10px; width:120px;" placeholder="اسم العامل"></div>
-        <button class="btn-dark" id="clear-filters" style="padding:7px 12px; font-size:12.5px;">مسح الفلاتر</button>
+        <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("worker")}</label><input id="worker-filter" class="input" style="font-size:12.5px; padding:7px 10px; width:120px;" placeholder="${t("worker")}"></div>
+        <button class="btn-dark" id="clear-filters" style="padding:7px 12px; font-size:12.5px;">${t("clearFilters")}</button>
       </div>
     </div>
 
@@ -579,26 +628,26 @@ function renderReports(main) {
       </div>
 
       <div class="card" id="section-lowstock" style="margin-bottom:18px;">
-        <div style="font-weight:800; font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:7px;">${icon("alert", 16)} تقرير الأصناف المنخفضة والحرجة</div>
+        <div style="font-weight:800; font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:7px;">${icon("alert", 16)} ${t("lowStockSection")}</div>
         <div id="low-stock-list"></div>
       </div>
 
       <div class="card" id="section-consumption" style="margin-bottom:18px;">
-        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">الأصناف الأكثر سحبًا (إجمالي الاستهلاك)</div>
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("consumptionSection")}</div>
         <div id="consumption-list"></div>
       </div>
 
       <div class="card" id="section-daily" style="margin-bottom:18px;">
-        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">الملخص اليومي (الإدخال والسحب لكل يوم)</div>
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("dailySection")}</div>
         <div style="overflow:auto;"><table><thead><tr><th>اليوم</th><th>عدد عمليات الإدخال</th><th>إجمالي الكمية المُدخلة</th><th>عدد عمليات السحب</th><th>إجمالي الكمية المسحوبة</th></tr></thead><tbody id="daily-body"></tbody></table></div>
       </div>
 
       <div class="card" id="section-txlog">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-          <div style="font-weight:800; font-size:15px; display:flex; align-items:center; gap:7px;">${icon("history", 16)} سجل الحركات (بالتاريخ والساعة) — <span id="tx-count" class="mono" style="font-weight:600; color:var(--ink70); font-size:12.5px;"></span></div>
+          <div style="font-weight:800; font-size:15px; display:flex; align-items:center; gap:7px;">${icon("history", 16)} ${t("txLogSection")} — <span id="tx-count" class="mono" style="font-weight:600; color:var(--ink70); font-size:12.5px;"></span></div>
         </div>
         <div style="max-height:340px; overflow:auto;" class="print-scroll">
-          <table><thead><tr><th>الصنف</th><th>النوع</th><th>الكمية</th><th>العامل</th><th>ملاحظة</th><th>التاريخ والساعة</th></tr></thead><tbody id="tx-body"></tbody></table>
+          <table><thead><tr><th>${t("itemName")}</th><th>${t("status")}</th><th>${t("quantity")}</th><th>${t("worker")}</th><th>${t("note")}</th><th>${t("dateTime")}</th><th class="no-print"></th></tr></thead><tbody id="tx-body"></tbody></table>
         </div>
       </div>
     </div>`;
@@ -664,11 +713,17 @@ function renderReports(main) {
       return true;
     });
     $("#tx-count").textContent = `${filtered.length} حركة`;
+    const voucherLabel = t("voucherBtn");
     $("#tx-body").innerHTML = filtered.length ? filtered.map(t => `
       <tr><td style="font-weight:700;">${t.item_name}</td>
       <td>${t.type === "in" ? '<span style="color:var(--green); font-weight:700;">إدخال</span>' : '<span style="color:var(--red); font-weight:700;">سحب</span>'}</td>
       <td class="mono">${t.qty} ${t.unit || ""}</td><td>${t.worker || "—"}</td><td style="color:var(--ink70);">${t.note || "—"}</td>
-      <td class="mono" style="color:var(--ink70);">${fmtDate(t.created_at)}</td></tr>`).join("") : `<tr><td colspan="6"><div class="empty-note">لا توجد حركات ضمن هذا الفلتر.</div></td></tr>`;
+      <td class="mono" style="color:var(--ink70);">${fmtDate(t.created_at)}</td>
+      <td class="no-print"><button class="icon-btn" data-voucher="${t.id}" title="${voucherLabel}">${icon("history", 13)}</button></td></tr>`).join("") : `<tr><td colspan="7"><div class="empty-note">لا توجد حركات ضمن هذا الفلتر.</div></td></tr>`;
+    $$("[data-voucher]").forEach(b => b.onclick = () => {
+      const tx = state.transactions.find(x => x.id === b.dataset.voucher);
+      if (tx) printVoucher(tx);
+    });
     return filtered;
   };
   let currentFiltered = drawTx();
@@ -695,35 +750,45 @@ function renderReports(main) {
     const genTime2 = fmtDate(new Date().toISOString());
     const wb = XLSX.utils.book_new();
 
-    // ورقة: المخزون الحالي
+    if ($("#inc-lowstock").checked) {
+      const lowRows = lowStock.map(it => ({
+        "الصنف": it.name, "الكود": it.code || "", "الفئة": it.category || "",
+        "الكمية": it.qty, "الحد الأقصى": it.max_qty, "النسبة %": Math.round(pctOf(it)), "الحالة": STATUS_META[statusOf(it)].label,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lowRows.length ? lowRows : [{ "ملاحظة": "لا توجد أصناف منخفضة" }]), "الأصناف المنخفضة");
+    }
+
+    if ($("#inc-consumption").checked) {
+      const consRows = consumption.map(([name, val]) => ({ "الصنف": name, "إجمالي الكمية المسحوبة": val }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(consRows.length ? consRows : [{ "ملاحظة": "لا توجد عمليات سحب" }]), "الأكثر سحبًا");
+    }
+
+    // المخزون الحالي (مرجعي دايمًا)
     const stockRows = state.items.map(it => ({
-      "الصنف": it.name, "الفئة": it.category || "", "الوحدة": it.unit,
+      "الصنف": it.name, "الكود": it.code || "", "الفئة": it.category || "", "الوحدة": it.unit,
       "الكمية الحالية": it.qty, "الحد الأقصى": it.max_qty,
       "النسبة %": Math.round(pctOf(it)), "الحالة": STATUS_META[statusOf(it)].label,
     }));
-    const ws1 = XLSX.utils.json_to_sheet(stockRows);
-    XLSX.utils.book_append_sheet(wb, ws1, "المخزون الحالي");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockRows), "المخزون الحالي");
 
-    // ورقة: الملخص اليومي
-    const dailySheetRows = dailyRows.map(([day, d]) => ({
-      "اليوم": day, "عدد عمليات الإدخال": d.inCount, "إجمالي الكمية المُدخلة": d.inQty,
-      "عدد عمليات السحب": d.outCount, "إجمالي الكمية المسحوبة": d.outQty,
-    }));
-    const ws2 = XLSX.utils.json_to_sheet(dailySheetRows);
-    XLSX.utils.book_append_sheet(wb, ws2, "الملخص اليومي");
+    if ($("#inc-daily").checked) {
+      const dailySheetRows = dailyRows.map(([day, d]) => ({
+        "اليوم": day, "عدد عمليات الإدخال": d.inCount, "إجمالي الكمية المُدخلة": d.inQty,
+        "عدد عمليات السحب": d.outCount, "إجمالي الكمية المسحوبة": d.outQty,
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailySheetRows.length ? dailySheetRows : [{ "ملاحظة": "لا توجد بيانات" }]), "الملخص اليومي");
+    }
 
-    // ورقة: سجل الحركات (بالتاريخ والساعة)
-    const txRows = currentFiltered.map(t => ({
-      "الصنف": t.item_name, "النوع": t.type === "in" ? "إدخال" : "سحب", "الكمية": t.qty,
-      "الوحدة": t.unit || "", "العامل": t.worker || "", "ملاحظة": t.note || "",
-      "التاريخ والساعة": fmtDate(t.created_at),
-    }));
-    const ws3 = XLSX.utils.json_to_sheet(txRows.length ? txRows : [{ "ملاحظة": "لا توجد حركات ضمن هذا الفلتر" }]);
-    XLSX.utils.book_append_sheet(wb, ws3, "سجل الحركات");
+    if ($("#inc-txlog").checked) {
+      const txRows = currentFiltered.map(t => ({
+        "الصنف": t.item_name, "النوع": t.type === "in" ? "إدخال" : "سحب", "الكمية": t.qty,
+        "الوحدة": t.unit || "", "العامل": t.worker || "", "ملاحظة": t.note || "",
+        "التاريخ والساعة": fmtDate(t.created_at),
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows.length ? txRows : [{ "ملاحظة": "لا توجد حركات ضمن هذا الفلتر" }]), "سجل الحركات");
+    }
 
-    // ورقة: معلومات التقرير
-    const ws4 = XLSX.utils.json_to_sheet([{ "المصنع": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]);
-    XLSX.utils.book_append_sheet(wb, ws4, "معلومات التقرير");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ "المصنع": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]), "معلومات التقرير");
 
     XLSX.writeFile(wb, `تقرير_المخزون_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
@@ -776,6 +841,69 @@ function renderSettings(main) {
     if (error) { toast("تعذر حفظ الإعدادات", true); return; }
     await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
   };
+}
+
+/* ---------------- طباعة إذن صرف / إذن استلام لحركة واحدة ---------------- */
+function printVoucher(tx) {
+  const isIn = tx.type === "in";
+  const title = isIn ? "إذن استلام مخزني" : "إذن صرف مخزني";
+  const voucherNo = (tx.id || "").slice(0, 8).toUpperCase();
+  const w = state.settings;
+  const item = state.items.find(i => i.name === tx.item_name);
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${title} - ${voucherNo}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+  *{box-sizing:border-box; font-family:'Cairo',sans-serif;}
+  body{padding:36px; color:#17323C; direction:rtl;}
+  .head{display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #17323C; padding-bottom:16px; margin-bottom:20px;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand img{width:52px; height:52px; border-radius:10px; object-fit:cover;}
+  .brand-name{font-weight:800; font-size:19px;}
+  .brand-sub{font-size:11.5px; color:#666;}
+  .voucher-title{font-size:22px; font-weight:800; color:${isIn ? "#2F8F5B" : "#C85D51"};}
+  .voucher-no{font-size:12px; color:#666; margin-top:4px;}
+  table{width:100%; border-collapse:collapse; margin:22px 0;}
+  td, th{border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right;}
+  th{background:#f2f2f2; width:160px; font-weight:700;}
+  .signatures{display:flex; justify-content:space-between; margin-top:60px;}
+  .sig{width:30%; text-align:center;}
+  .sig-line{border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;}
+  .footer{margin-top:40px; font-size:10.5px; color:#999; text-align:center;}
+  @media print{ body{padding:14px;} }
+</style></head>
+<body>
+  <div class="head">
+    <div class="brand">
+      ${w.logo_base64 ? `<img src="${w.logo_base64}">` : ""}
+      <div><div class="brand-name">${w.workshop_name || "مصنع نسيج"}</div>
+      <div class="brand-sub">${w.address || ""}${w.address && w.phone ? " · " : ""}${w.phone || ""}</div></div>
+    </div>
+    <div style="text-align:left;">
+      <div class="voucher-title">${title}</div>
+      <div class="voucher-no">رقم الإذن: ${voucherNo}</div>
+    </div>
+  </div>
+  <table>
+    <tr><th>التاريخ والساعة</th><td>${fmtDate(tx.created_at)}</td></tr>
+    <tr><th>الصنف</th><td>${tx.item_name}${item?.code ? ` (${item.code})` : ""}</td></tr>
+    <tr><th>الفئة</th><td>${item?.category || "—"}</td></tr>
+    <tr><th>الكمية</th><td>${tx.qty} ${tx.unit || ""}</td></tr>
+    <tr><th>${isIn ? "المورد / جهة التوريد" : "المستلم / العامل"}</th><td>${tx.worker || "—"}</td></tr>
+    <tr><th>ملاحظات</th><td>${tx.note || "—"}</td></tr>
+  </table>
+  <div class="signatures">
+    <div class="sig"><div class="sig-line">أمين المخزن</div></div>
+    <div class="sig"><div class="sig-line">${isIn ? "المورد" : "المستلم"}</div></div>
+    <div class="sig"><div class="sig-line">اعتماد المدير</div></div>
+  </div>
+  <div class="footer">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخزون — ${fmtDate(nowISO())}</div>
+</body></html>`;
+  const win = window.open("", "_blank", "width=800,height=900");
+  if (!win) { toast("المتصفح منع فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع", true); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
 }
 
 /* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
