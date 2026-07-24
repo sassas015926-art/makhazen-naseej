@@ -1,10 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 
 :root{
-  --ink:#1C2333; --ink-soft:#2B3247; --paper:#EFEBE2; --paper-deep:#E4DFD2;
-  --card:#FBFAF6; --mustard:#C9971F; --mustard-soft:#F1DFAE;
-  --red:#B8433A; --red-soft:#F3D9D5; --green:#4C7A5E; --green-soft:#DCE9DF;
-  --ink70:rgba(28,35,51,.7); --ink50:rgba(28,35,51,.5); --ink12:rgba(28,35,51,.12);
+  --ink:#1E3A44; --ink-soft:#284A55; --paper:#EAF5F5; --paper-deep:#D8ECEB;
+  --card:#FFFFFF; --mustard:#3FA9C9; --mustard-soft:#DDF1F7;
+  --red:#D9695D; --red-soft:#FBE6E3; --green:#3FA66B; --green-soft:#E1F5E9;
+  --ink70:rgba(30,58,68,.7); --ink50:rgba(30,58,68,.5); --ink12:rgba(30,58,68,.12);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
 body{font-family:'Cairo',sans-serif; background:var(--paper); color:var(--ink); direction:rtl;}
@@ -63,7 +63,7 @@ main{flex:1; padding:24px 28px; overflow:auto;}
 .pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap;}
 .pill-dot{width:6px; height:6px; border-radius:50%;}
 .pill-critical{color:var(--red); background:var(--red-soft);}
-.pill-warning{color:#8A6A16; background:var(--mustard-soft);}
+.pill-warning{color:#C98A2E; background:var(--mustard-soft);}
 .pill-ok{color:var(--green); background:var(--green-soft);}
 
 .tape{width:100%; height:14px; border-radius:14px; background:var(--paper-deep); overflow:hidden; border:1px solid var(--ink12); position:relative;}

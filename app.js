@@ -41,14 +41,16 @@ const I18N = {
     dir: "rtl", loginTitle: "تسجيل الدخول لإدارة المخازن", loginUser: "اسم المستخدم", loginPass: "كلمة المرور",
     loginBtn: "تسجيل الدخول", loginLoading: "...جارِ الدخول", loginError: "اسم المستخدم أو كلمة المرور غير صحيحة",
     navDashboard: "لوحة التحكم", navIn: "إدخال مخزون", navOut: "سحب من المخزن", navStock: "المخزون الحالي",
-    navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات والأصناف",
+    navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات",
+    navItems: "إدارة الأصناف",
     logout: "خروج",
   },
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
     loginBtn: "Giriş Yap", loginLoading: "...Giriş yapılıyor", loginError: "Kullanıcı adı veya şifre hatalı",
     navDashboard: "Kontrol Paneli", navIn: "Stok Girişi", navOut: "Depodan Çıkış", navStock: "Mevcut Stok",
-    navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar ve Ürünler",
+    navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar",
+    navItems: "Ürün Yönetimi",
     logout: "Çıkış",
   },
 };
@@ -69,9 +71,31 @@ function applyLoginTexts() {
   $$(".lang-btn").forEach(b => b.classList.toggle("active-lang", b.dataset.lang === state.lang));
 }
 
-function myRole() { return state.profile?.role || "keeper"; }
+const ROLE_LABELS = {
+  admin: "مدير النظام",
+  factory_manager: "مدير المصنع",
+  keeper: "أمين مخزن",
+  production_manager: "مدير الإنتاج",
+  accountant: "المحاسب",
+  quality: "مراقب الجودة",
+  viewer: "للقراءة فقط",
+};
+// كل تبويب مسموح لمين — طبقًا لمصفوفة الصلاحيات المتفق عليها
+const TAB_ROLES = {
+  dashboard: ["admin", "factory_manager", "keeper", "production_manager", "quality", "viewer"],
+  stock: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"],
+  in: ["admin", "keeper"],
+  out: ["admin", "keeper"],
+  reports: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"],
+  audit: ["admin", "factory_manager", "keeper"],
+  items: ["admin", "keeper"],
+  users: ["admin"],
+  settings: ["admin"],
+};
+function myRole() { return state.profile?.role || "viewer"; }
 function isAdmin() { return myRole() === "admin"; }
 function canEdit() { return myRole() === "admin" || myRole() === "keeper"; }
+function firstAllowedTab() { return Object.keys(TAB_ROLES).find(id => TAB_ROLES[id].includes(myRole())) || "stock"; }
 function deviceInfo() {
   const ua = navigator.userAgent || "";
   let dev = "جهاز غير معروف";
@@ -110,9 +134,9 @@ function statusOf(item) {
   return "ok";
 }
 const STATUS_META = {
-  critical: { label: "حرج", cls: "pill-critical", color: "#B8433A" },
-  warning: { label: "منخفض", cls: "pill-warning", color: "#C9971F" },
-  ok: { label: "جيد", cls: "pill-ok", color: "#4C7A5E" },
+  critical: { label: "حرج", cls: "pill-critical", color: "#D9695D" },
+  warning: { label: "منخفض", cls: "pill-warning", color: "#C98A2E" },
+  ok: { label: "جيد", cls: "pill-ok", color: "#3FA66B" },
 };
 function pill(status) {
   const m = STATUS_META[status];
@@ -258,18 +282,19 @@ function showApp() {
 
 /* ---------------- nav ---------------- */
 const NAV = [
-  { id: "dashboard", labelKey: "navDashboard", icon: "grid", roles: ["admin", "keeper", "viewer"] },
-  { id: "in", labelKey: "navIn", icon: "in", roles: ["admin", "keeper"] },
-  { id: "out", labelKey: "navOut", icon: "out", roles: ["admin", "keeper"] },
-  { id: "stock", labelKey: "navStock", icon: "package", roles: ["admin", "keeper", "viewer"] },
-  { id: "reports", labelKey: "navReports", icon: "chart", roles: ["admin", "keeper", "viewer"] },
-  { id: "audit", labelKey: "navAudit", icon: "history", roles: ["admin", "keeper", "viewer"] },
-  { id: "users", labelKey: "navUsers", icon: "gear", roles: ["admin"] },
-  { id: "settings", labelKey: "navSettings", icon: "gear", roles: ["admin", "keeper"] },
+  { id: "dashboard", labelKey: "navDashboard", icon: "grid" },
+  { id: "in", labelKey: "navIn", icon: "in" },
+  { id: "out", labelKey: "navOut", icon: "out" },
+  { id: "stock", labelKey: "navStock", icon: "package" },
+  { id: "reports", labelKey: "navReports", icon: "chart" },
+  { id: "audit", labelKey: "navAudit", icon: "history" },
+  { id: "items", labelKey: "navItems", icon: "package" },
+  { id: "users", labelKey: "navUsers", icon: "gear" },
+  { id: "settings", labelKey: "navSettings", icon: "gear" },
 ];
 function renderNav() {
   const critical = state.items.filter(i => statusOf(i) === "critical").length;
-  const visible = NAV.filter(n => n.roles.includes(myRole()));
+  const visible = NAV.filter(n => (TAB_ROLES[n.id] || []).includes(myRole()));
   $("#nav-list").innerHTML = visible.map(n => `
     <button class="nav-btn ${state.tab === n.id ? "active" : ""}" data-tab="${n.id}">
       ${icon(n.icon, 18)}<span>${t(n.labelKey)}</span>
@@ -281,8 +306,7 @@ function renderNav() {
     if (state.tab === "users") await loadProfiles();
     render();
   });
-  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
-  const roleTag = $("#who-role"); if (roleTag) roleTag.textContent = roleLabels[myRole()] || "";
+  const roleTag = $("#who-role"); if (roleTag) roleTag.textContent = ROLE_LABELS[myRole()] || "";
 }
 
 /* ---------------- render dispatcher ---------------- */
@@ -296,14 +320,14 @@ function render() {
   } else banner.classList.add("hidden");
 
   const main = $("#main");
-  const allowed = NAV.find(n => n.id === state.tab);
-  if (!allowed || !allowed.roles.includes(myRole())) state.tab = "dashboard";
+  if (!TAB_ROLES[state.tab] || !TAB_ROLES[state.tab].includes(myRole())) state.tab = firstAllowedTab();
   if (state.tab === "dashboard") renderDashboard(main);
   else if (state.tab === "in") renderMove(main, "in");
   else if (state.tab === "out") renderMove(main, "out");
   else if (state.tab === "stock") renderStock(main);
   else if (state.tab === "reports") renderReports(main);
   else if (state.tab === "audit") renderAudit(main);
+  else if (state.tab === "items") renderItemsAdmin(main);
   else if (state.tab === "users") renderUsers(main);
   else if (state.tab === "settings") renderSettings(main);
 }
@@ -322,7 +346,7 @@ function renderDashboard(main) {
     { label: "إجمالي الأصناف", value: items.length, icon: "package", color: "var(--ink)" },
     { label: `أصناف حرجة (أقل من ${state.settings.alert_threshold_percent || 15}%)`, value: critical.length, icon: "alert", color: "var(--red)" },
     { label: "عمليات إدخال اليوم", value: todayIn, icon: "in", color: "var(--green)" },
-    { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#8A6A16" },
+    { label: "عمليات سحب اليوم", value: todayOut, icon: "out", color: "#C98A2E" },
   ];
 
   main.innerHTML = `
@@ -653,9 +677,7 @@ function renderReports(main) {
 /* ---------------- settings (branding + categories + items) ---------------- */
 function renderSettings(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">الإعدادات والأصناف</div><div class="section-sub">اسم المصنع، الشعار، أنواع المنتجات، وإدارة الأصناف</div></div></div>
-
-    ${isAdmin() ? `
+    <div class="section-header"><div><div class="section-title">الإعدادات</div><div class="section-sub">اسم المصنع، الشعار، بيانات الاتصال، ونسب التنبيه</div></div></div>
     <div class="card" style="margin-bottom:18px; max-width:480px;">
       <div style="font-weight:800; font-size:15px; margin-bottom:14px;">بيانات المصنع</div>
       <div class="field"><label>اسم المصنع</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
@@ -677,10 +699,34 @@ function renderSettings(main) {
         <div class="field" style="flex:1;"><label>نسبة تنبيه "منخفض" %</label><input id="ws-warn" type="number" min="1" max="95" class="input mono" style="width:100%;" value="${state.settings.warning_threshold_percent || 30}"></div>
       </div>
       <button class="btn-primary" id="ws-save">حفظ بيانات المصنع</button>
-    </div>` : `
-    <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-size:12.5px; color:var(--ink70);">بيانات المصنع (الاسم، الشعار، نسب التنبيه) يتحكم بيها مدير النظام فقط. تقدر تدير الفئات والأصناف تحت.</div>
-    </div>`}
+    </div>`;
+
+  let logoData = state.settings.logo_base64 || null;
+  $("#ws-logo").onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { logoData = reader.result; toast("تم اختيار الشعار — اضغط حفظ لتأكيده"); };
+    reader.readAsDataURL(file);
+  };
+  $("#ws-save").onclick = async () => {
+    const name = $("#ws-name").value.trim() || "مصنع نسيج";
+    const payload = {
+      workshop_name: name, logo_base64: logoData,
+      address: $("#ws-address").value.trim(), phone: $("#ws-phone").value.trim(),
+      alert_threshold_percent: Number($("#ws-crit").value) || 15,
+      warning_threshold_percent: Number($("#ws-warn").value) || 30,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await sb.from("settings").update(payload).eq("id", 1);
+    if (error) { toast("تعذر حفظ الإعدادات", true); return; }
+    await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
+  };
+}
+
+/* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
+function renderItemsAdmin(main) {
+  main.innerHTML = `
+    <div class="section-header"><div><div class="section-title">إدارة الأصناف</div><div class="section-sub">أنواع المنتجات (الفئات)، والأصناف تحت كل فئة</div></div></div>
 
     <div class="card" style="margin-bottom:18px; max-width:480px;">
       <div style="font-weight:800; font-size:15px; margin-bottom:14px;">أنواع المنتجات (الفئات)</div>
@@ -691,44 +737,19 @@ function renderSettings(main) {
       </div>
     </div>
 
-    <div class="section-header"><div style="font-weight:800; font-size:16px;">إدارة الأصناف</div>
+    <div class="section-header"><div style="font-weight:800; font-size:16px;">الأصناف</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} صنف جديد</button></div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>الكود</th><th>الصنف</th><th>الفئة</th><th>الوحدة</th><th>الكمية الحالية</th><th>الحد الأقصى</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
-  // branding (admin only — القسم ده أصلًا مش ظاهر في الواجهة لغير المدير)
-  if (isAdmin()) {
-    let logoData = state.settings.logo_base64 || null;
-    $("#ws-logo").onchange = (e) => {
-      const file = e.target.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => { logoData = reader.result; toast("تم اختيار الشعار — اضغط حفظ لتأكيده"); };
-      reader.readAsDataURL(file);
-    };
-    $("#ws-save").onclick = async () => {
-      const name = $("#ws-name").value.trim() || "مصنع نسيج";
-      const payload = {
-        workshop_name: name, logo_base64: logoData,
-        address: $("#ws-address").value.trim(), phone: $("#ws-phone").value.trim(),
-        alert_threshold_percent: Number($("#ws-crit").value) || 15,
-        warning_threshold_percent: Number($("#ws-warn").value) || 30,
-        updated_at: new Date().toISOString(),
-      };
-      const { error } = await sb.from("settings").update(payload).eq("id", 1);
-      if (error) { toast("تعذر حفظ الإعدادات", true); return; }
-      await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
-    };
-  }
-
-  // categories (متاحة للمدير وأمين المخزن)
   const drawCats = () => {
     $("#cat-chips").innerHTML = state.categories.map(c => `<span class="chip">${c}<button data-cat="${c}">${icon("x", 12)}</button></span>`).join("");
     $$("[data-cat]").forEach(b => b.onclick = async () => {
       if (!confirm(`حذف فئة "${b.dataset.cat}"؟ (لن يتأثر الأصناف الموجودة بها)`)) return;
       await sb.from("categories").delete().eq("name", b.dataset.cat);
       logAudit({ action: "حذف فئة", entity: "category", entityName: b.dataset.cat });
-      await loadCategories(); renderSettings(main);
+      await loadCategories(); renderItemsAdmin(main);
     });
   };
   drawCats();
@@ -738,10 +759,9 @@ function renderSettings(main) {
     const { error } = await sb.from("categories").insert({ name: val });
     if (error) { toast("هذه الفئة موجودة بالفعل", true); return; }
     logAudit({ action: "إضافة فئة", entity: "category", entityName: val });
-    await loadCategories(); renderSettings(main); toast("تمت إضافة الفئة");
+    await loadCategories(); renderItemsAdmin(main); toast("تمت إضافة الفئة");
   };
 
-  // items table (متاحة للمدير وأمين المخزن)
   const drawItems = () => {
     $("#items-body").innerHTML = state.items.map(it => `
       <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td><td style="font-weight:700;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
@@ -756,7 +776,7 @@ function renderSettings(main) {
       if (!confirm(`حذف "${it.name}" نهائيًا؟`)) return;
       await sb.from("items").delete().eq("id", it.id);
       logAudit({ action: "حذف صنف", entity: "item", entityName: it.name });
-      await loadItems(); renderSettings(main); toast("تم حذف الصنف");
+      await loadItems(); renderItemsAdmin(main); toast("تم حذف الصنف");
     });
   };
   drawItems();
@@ -765,7 +785,7 @@ function renderSettings(main) {
 
 /* ---------------- user management (admin only) ---------------- */
 function renderUsers(main) {
-  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
+  const roleLabels = ROLE_LABELS;
   main.innerHTML = `
     <div class="section-header">
       <div><div class="section-title">إدارة المستخدمين</div><div class="section-sub">إنشاء الحسابات، تحديد الصلاحيات، إيقاف أو حذف المستخدمين</div></div>
@@ -835,7 +855,7 @@ async function callManageUsers(payload) {
 }
 
 function openNewUserModal(main) {
-  const roleLabels = { admin: "مدير النظام", keeper: "أمين مخزن", viewer: "موظف (قراءة فقط)" };
+  const roleLabels = ROLE_LABELS;
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
