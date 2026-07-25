@@ -32,7 +32,7 @@ const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "�
 const state = {
   user: null, profile: null,
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
-  categories: [], items: [], transactions: [], profiles: [], auditLog: [],
+  categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [],
   tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), pendingItemFilter: null,
 };
 
@@ -43,7 +43,7 @@ const I18N = {
     brandSub: "إدارة المخازن",
     navDashboard: "لوحة التحكم", navIn: "إدخال مخزون", navOut: "سحب من المخزن", navStock: "المخزون الحالي",
     navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات",
-    navItems: "إدارة الأصناف",
+    navItems: "إدارة الأصناف", navSuppliers: "الموردون",
     logout: "خروج",
     // عام
     save: "حفظ", add: "إضافة", delete: "حذف", edit: "تعديل", cancel: "إلغاء", search: "بحث", confirmBtn: "تأكيد",
@@ -96,7 +96,7 @@ const I18N = {
     brandSub: "Depo Yönetimi",
     navDashboard: "Kontrol Paneli", navIn: "Stok Girişi", navOut: "Depodan Çıkış", navStock: "Mevcut Stok",
     navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar",
-    navItems: "Ürün Yönetimi",
+    navItems: "Ürün Yönetimi", navSuppliers: "Tedarikçiler",
     logout: "Çıkış",
     // genel
     save: "Kaydet", add: "Ekle", delete: "Sil", edit: "Düzenle", cancel: "İptal", search: "Ara", confirmBtn: "Onayla",
@@ -180,6 +180,7 @@ const TAB_ROLES = {
   reports: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"],
   audit: ["admin", "factory_manager", "keeper"],
   items: ["admin", "keeper"],
+  suppliers: ["admin", "keeper"],
   users: ["admin"],
   settings: ["admin"],
 };
@@ -305,6 +306,10 @@ async function loadAuditLog() {
   const { data } = await sb.from("audit_log").select("*").order("created_at", { ascending: false }).limit(300);
   state.auditLog = data || [];
 }
+async function loadBackups() {
+  const { data } = await sb.from("backups").select("id, created_at, created_by").order("created_at", { ascending: false }).limit(10);
+  state.backups = data || [];
+}
 async function loadAll() {
   await Promise.all([loadSettings(), loadCategories(), loadItems(), loadTransactions(), loadProfile()]);
   await Promise.all([loadProfiles(), loadAuditLog()]);
@@ -381,6 +386,7 @@ const NAV = [
   { id: "reports", labelKey: "navReports", icon: "chart" },
   { id: "audit", labelKey: "navAudit", icon: "history" },
   { id: "items", labelKey: "navItems", icon: "package" },
+  { id: "suppliers", labelKey: "navSuppliers", icon: "package" },
   { id: "users", labelKey: "navUsers", icon: "gear" },
   { id: "settings", labelKey: "navSettings", icon: "gear" },
 ];
@@ -421,6 +427,7 @@ function render() {
   else if (state.tab === "reports") renderReports(main);
   else if (state.tab === "audit") renderAudit(main);
   else if (state.tab === "items") renderItemsAdmin(main);
+  else if (state.tab === "suppliers") renderSuppliers(main);
   else if (state.tab === "users") renderUsers(main);
   else if (state.tab === "settings") renderSettings(main);
 }
@@ -859,6 +866,11 @@ function renderReports(main) {
     if ([...itemSel.options].some(o => o.value === state.pendingItemFilter)) {
       itemSel.value = state.pendingItemFilter;
       currentFiltered = drawTx();
+      // اختصار مباشر لتقرير حركة الصنف: امسح باقي الفلاتر، واقفل الأقسام التانية مؤقتًا، وانزل على طول لسجل الحركات
+      $("#range-filter").value = "all"; $("#type-filter").value = "all"; $("#date-from").value = ""; $("#date-to").value = ""; $("#worker-filter").value = "";
+      ["inc-lowstock", "inc-consumption", "inc-daily"].forEach(id => { $(`#${id}`).checked = false; });
+      $("#section-lowstock").classList.add("hidden"); $("#section-consumption").classList.add("hidden"); $("#section-daily").classList.add("hidden");
+      setTimeout(() => $("#section-txlog").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     }
     state.pendingItemFilter = null;
   }
@@ -954,7 +966,17 @@ function renderSettings(main) {
         <div class="field" style="flex:1;"><label>${t("warningPct")}</label><input id="ws-warn" type="number" min="1" max="95" class="input mono" style="width:100%;" value="${state.settings.warning_threshold_percent || 30}"></div>
       </div>
       <button class="btn-primary" id="ws-save">${t("saveFactoryInfo")}</button>
-    </div>`;
+    </div>
+
+    ${isAdmin() ? `
+    <div class="card" style="margin-bottom:18px; max-width:560px;">
+      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">النسخ الاحتياطي</div>
+      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">نسخة تلقائية كل يوم + إمكانية إنشاء نسخة يدوية أو استعادة نسخة سابقة. الاستعادة ترجّع الأصناف والفئات وبيانات المصنع فقط، وسجل الحركات لا يتأثر أبدًا.</div>
+      <button class="btn-dark" id="backup-now" style="margin-bottom:16px;">${icon("download", 14)} إنشاء نسخة احتياطية الآن</button>
+      <div id="backups-list"></div>
+    </div>` : ""}`;
+
+  if (isAdmin()) loadAndDrawBackups(main);
 
   let logoData = state.settings.logo_base64 || null;
   $("#ws-logo").onchange = (e) => {
@@ -975,6 +997,57 @@ function renderSettings(main) {
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
     if (error) { toast("تعذر حفظ الإعدادات", true); return; }
     await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
+  };
+}
+
+/* ---------------- النسخ الاحتياطي ---------------- */
+async function loadAndDrawBackups(main) {
+  await loadBackups();
+  const list = $("#backups-list");
+  if (!list) return;
+  list.innerHTML = state.backups.length ? `
+    <table><thead><tr><th>التاريخ والوقت</th><th>بواسطة</th><th></th></tr></thead><tbody>
+      ${state.backups.map(b => `
+        <tr>
+          <td class="mono">${fmtDate(b.created_at)}</td>
+          <td style="color:var(--ink70);">${b.created_by || "—"}</td>
+          <td><div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button class="icon-btn" data-dl-backup="${b.id}" title="تنزيل كملف JSON">${icon("download", 13)}</button>
+            <button class="icon-btn" style="color:var(--red);" data-restore-backup="${b.id}" title="استعادة هذه النسخة">${icon("history", 13)}</button>
+          </div></td>
+        </tr>`).join("")}
+    </tbody></table>` : `<div class="empty-note">لا توجد نسخ احتياطية بعد — اضغط "إنشاء نسخة احتياطية الآن" لعمل أول نسخة.</div>`;
+
+  $$("[data-dl-backup]").forEach(b => b.onclick = async () => {
+    const { data } = await sb.from("backups").select("*").eq("id", b.dataset.dlBackup).maybeSingle();
+    if (!data) { toast("تعذر تحميل النسخة", true); return; }
+    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `نسخة_احتياطية_${data.created_at.slice(0, 10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $$("[data-restore-backup]").forEach(b => b.onclick = async () => {
+    if (!confirm("هل أنت متأكد من استعادة هذه النسخة؟ سيتم استبدال الأصناف والفئات وبيانات المصنع الحالية بمحتوى هذه النسخة. سجل الحركات لن يتأثر. سيتم أخذ نسخة أمان تلقائية قبل الاستعادة.")) return;
+    const { error } = await sb.rpc("restore_backup", { backup_id: b.dataset.restoreBackup });
+    if (error) { toast("تعذر الاستعادة: " + error.message, true); return; }
+    logAudit({ action: "استعادة نسخة احتياطية", entity: "backup", entityName: b.dataset.restoreBackup });
+    await Promise.all([loadItems(), loadCategories(), loadSettings()]);
+    applyBranding();
+    toast("تمت الاستعادة بنجاح");
+    renderSettings(main);
+  });
+
+  const btn = $("#backup-now");
+  if (btn) btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = "...جارِ الإنشاء";
+    const { error } = await sb.rpc("create_backup", { actor: state.profile?.full_name || "يدوي" });
+    btn.disabled = false; btn.innerHTML = `${icon("download", 14)} إنشاء نسخة احتياطية الآن`;
+    if (error) { toast("تعذر إنشاء النسخة: " + error.message, true); return; }
+    logAudit({ action: "إنشاء نسخة احتياطية يدوية", entity: "backup" });
+    toast("تم إنشاء النسخة الاحتياطية");
+    await loadAndDrawBackups(main);
   };
 }
 
@@ -1017,11 +1090,11 @@ function printVoucher(tx) {
     </div>`;
   const container = document.getElementById("voucher-print-only");
   container.innerHTML = html;
-  document.body.classList.add("printing-voucher");
+  document.body.classList.add("voucher-mode");
   window.print();
 }
 window.addEventListener("afterprint", () => {
-  document.body.classList.remove("printing-voucher");
+  document.body.classList.remove("voucher-mode");
   const c = document.getElementById("voucher-print-only");
   if (c) c.innerHTML = "";
 });
