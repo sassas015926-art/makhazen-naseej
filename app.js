@@ -33,7 +33,7 @@ const state = {
   user: null, profile: null,
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
   categories: [], items: [], transactions: [], profiles: [], auditLog: [],
-  tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"),
+  tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), pendingItemFilter: null,
 };
 
 const I18N = {
@@ -498,9 +498,9 @@ function renderDashboard(main) {
       `<div style="display:flex; flex-direction:column; gap:9px;">
           ${tx.slice(0, 8).map(t => `
             <div style="display:flex; align-items:center; gap:9px; font-size:12.8px;">
-              ${icon(t.type === "in" ? "in" : "out", 15)}
+              <span style="color:${t.type === "in" ? "var(--green)" : "var(--red)"}; display:flex; align-items:center;">${icon(t.type === "in" ? "in" : "out", 15)}</span>
               <span style="font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.item_name}</span>
-              <span class="mono" style="color:var(--ink70)">${t.type === "in" ? "+" : "-"}${t.qty} ${t.unit || ""}</span>
+              <span class="mono" style="color:${t.type === "in" ? "var(--green)" : "var(--red)"}; font-weight:700;">${t.type === "in" ? "+" : "-"}${t.qty} ${t.unit || ""}</span>
             </div>`).join("")}
         </div>`}
       </div>
@@ -683,21 +683,23 @@ function renderStock(main) {
       <select id="stock-cat" class="input"><option value="__all__">${t("all")}</option>${state.categories.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("quantity")}</th><th>%</th><th>${t("status")}</th></tr></thead><tbody id="stock-body"></tbody></table>
+      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("quantity")}</th><th>%</th><th>${t("status")}</th><th></th></tr></thead><tbody id="stock-body"></tbody></table>
     </div>`;
   const draw = () => {
     const q = ($("#stock-search").value || "").toLowerCase();
     const cat = $("#stock-cat").value;
     const filtered = state.items.filter(i => (cat === "__all__" || i.category === cat) && (i.name.toLowerCase().includes(q) || (i.code || "").toLowerCase().includes(q)));
-    if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="6"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
+    if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="7"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
     const groups = {};
     filtered.forEach(it => { const c = it.category || "بدون فئة"; (groups[c] = groups[c] || []).push(it); });
     $("#stock-body").innerHTML = Object.entries(groups).map(([catName, catItems]) => `
-      <tr><td colspan="6" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);">${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
+      <tr><td colspan="7" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);">${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
       ${catItems.map(it => `
         <tr><td class="mono" style="color:var(--mustard); font-weight:700;">${it.code || "—"}</td><td style="font-weight:700; padding-right:26px;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td>
-        <td class="mono">${it.qty} / ${it.max_qty} ${it.unit}</td><td style="width:200px;">${tape(it, true)}</td><td>${pill(statusOf(it))}</td></tr>`).join("")}
+        <td class="mono">${it.qty} / ${it.max_qty} ${it.unit}</td><td style="width:200px;">${tape(it, true)}</td><td>${pill(statusOf(it))}</td>
+        <td><button class="icon-btn" data-movement="${it.name}" title="عرض حركة هذا الصنف">${icon("history", 13)}</button></td></tr>`).join("")}
     `).join("");
+    $$("[data-movement]").forEach(b => b.onclick = () => { state.pendingItemFilter = b.dataset.movement; state.tab = "reports"; render(); });
   };
   $("#stock-search").oninput = draw; $("#stock-cat").onchange = draw; draw();
 }
@@ -852,6 +854,14 @@ function renderReports(main) {
     return filtered;
   };
   let currentFiltered = drawTx();
+  if (state.pendingItemFilter) {
+    const itemSel = $("#item-filter");
+    if ([...itemSel.options].some(o => o.value === state.pendingItemFilter)) {
+      itemSel.value = state.pendingItemFilter;
+      currentFiltered = drawTx();
+    }
+    state.pendingItemFilter = null;
+  }
   ["range-filter", "type-filter", "item-filter"].forEach(id => $(`#${id}`).onchange = () => { currentFiltered = drawTx(); });
   ["date-from", "date-to"].forEach(id => $(`#${id}`).onchange = () => { $("#range-filter").value = "all"; currentFiltered = drawTx(); });
   $("#worker-filter").oninput = () => { currentFiltered = drawTx(); };
@@ -884,7 +894,7 @@ function renderReports(main) {
     }
 
     if ($("#inc-consumption").checked) {
-      const consRows = consumption.map(([name, val]) => ({ "الصنف": name, "إجمالي الكمية المسحوبة": val }));
+      const consRows = cons.map(([name, val]) => ({ "الصنف": name, "إجمالي الكمية المسحوبة": val }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(consRows.length ? consRows : [{ "ملاحظة": "لا توجد عمليات سحب" }]), "الأكثر سحبًا");
     }
 
@@ -975,61 +985,46 @@ function printVoucher(tx) {
   const voucherNo = (tx.id || "").slice(0, 8).toUpperCase();
   const w = state.settings;
   const item = state.items.find(i => i.name === tx.item_name);
-  const html = `<!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${title} - ${voucherNo}</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
-  *{box-sizing:border-box; font-family:'Cairo',sans-serif;}
-  body{padding:36px; color:#17323C; direction:rtl;}
-  .head{display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #17323C; padding-bottom:16px; margin-bottom:20px;}
-  .brand{display:flex; align-items:center; gap:12px;}
-  .brand img{width:52px; height:52px; border-radius:10px; object-fit:cover;}
-  .brand-name{font-weight:800; font-size:19px;}
-  .brand-sub{font-size:11.5px; color:#666;}
-  .voucher-title{font-size:22px; font-weight:800; color:${isIn ? "#2F8F5B" : "#C85D51"};}
-  .voucher-no{font-size:12px; color:#666; margin-top:4px;}
-  table{width:100%; border-collapse:collapse; margin:22px 0;}
-  td, th{border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right;}
-  th{background:#f2f2f2; width:160px; font-weight:700;}
-  .signatures{display:flex; justify-content:space-between; margin-top:60px;}
-  .sig{width:30%; text-align:center;}
-  .sig-line{border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;}
-  .footer{margin-top:40px; font-size:10.5px; color:#999; text-align:center;}
-  @media print{ body{padding:14px;} }
-</style></head>
-<body>
-  <div class="head">
-    <div class="brand">
-      ${w.logo_base64 ? `<img src="${w.logo_base64}">` : ""}
-      <div><div class="brand-name">${w.workshop_name || "مصنع نسيج"}</div>
-      <div class="brand-sub">${w.address || ""}${w.address && w.phone ? " · " : ""}${w.phone || ""}</div></div>
-    </div>
-    <div style="text-align:left;">
-      <div class="voucher-title">${title}</div>
-      <div class="voucher-no">رقم الإذن: ${voucherNo}</div>
-    </div>
-  </div>
-  <table>
-    <tr><th>التاريخ والساعة</th><td>${fmtDate(tx.created_at)}</td></tr>
-    <tr><th>الصنف</th><td>${tx.item_name}${item?.code ? ` (${item.code})` : ""}</td></tr>
-    <tr><th>الفئة</th><td>${item?.category || "—"}</td></tr>
-    <tr><th>الكمية</th><td>${tx.qty} ${tx.unit || ""}</td></tr>
-    <tr><th>${isIn ? "المورد / جهة التوريد" : "المستلم / العامل"}</th><td>${tx.worker || "—"}</td></tr>
-    <tr><th>ملاحظات</th><td>${tx.note || "—"}</td></tr>
-  </table>
-  <div class="signatures">
-    <div class="sig"><div class="sig-line">أمين المخزن</div></div>
-    <div class="sig"><div class="sig-line">${isIn ? "المورد" : "المستلم"}</div></div>
-    <div class="sig"><div class="sig-line">اعتماد المدير</div></div>
-  </div>
-  <div class="footer">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(nowISO())}</div>
-</body></html>`;
-  const win = window.open("", "_blank", "width=800,height=900");
-  if (!win) { toast("المتصفح منع فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع", true); return; }
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { win.focus(); win.print(); };
+  const html = `
+    <div style="padding:20px; color:#17323C; direction:rtl; max-width:800px; margin:0 auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #17323C; padding-bottom:16px; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          ${w.logo_base64 ? `<img src="${w.logo_base64}" style="width:52px; height:52px; border-radius:10px; object-fit:cover;">` : ""}
+          <div>
+            <div style="font-weight:800; font-size:19px;">${w.workshop_name || "مصنع نسيج"}</div>
+            <div style="font-size:11.5px; color:#666;">${w.address || ""}${w.address && w.phone ? " · " : ""}${w.phone || ""}</div>
+          </div>
+        </div>
+        <div style="text-align:left;">
+          <div style="font-size:22px; font-weight:800; color:${isIn ? "#2F8F5B" : "#C85D51"};">${title}</div>
+          <div style="font-size:12px; color:#666; margin-top:4px;">رقم الإذن: ${voucherNo}</div>
+        </div>
+      </div>
+      <table style="width:100%; border-collapse:collapse; margin:22px 0;">
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; width:160px; font-weight:700;">التاريخ والساعة</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${fmtDate(tx.created_at)}</td></tr>
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; font-weight:700;">الصنف</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${tx.item_name}${item?.code ? ` (${item.code})` : ""}</td></tr>
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; font-weight:700;">الفئة</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${item?.category || "—"}</td></tr>
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; font-weight:700;">الكمية</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${tx.qty} ${tx.unit || ""}</td></tr>
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; font-weight:700;">${isIn ? "المورد / جهة التوريد" : "المستلم / العامل"}</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${tx.worker || "—"}</td></tr>
+        <tr><th style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px; text-align:right; background:#f2f2f2; font-weight:700;">ملاحظات</th><td style="border:1px solid #ccc; padding:10px 14px; font-size:13.5px;">${tx.note || "—"}</td></tr>
+      </table>
+      <div style="display:flex; justify-content:space-between; margin-top:60px;">
+        <div style="width:30%; text-align:center;"><div style="border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;">أمين المخزن</div></div>
+        <div style="width:30%; text-align:center;"><div style="border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;">${isIn ? "المورد" : "المستلم"}</div></div>
+        <div style="width:30%; text-align:center;"><div style="border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;">اعتماد المدير</div></div>
+      </div>
+      <div style="margin-top:40px; font-size:10.5px; color:#999; text-align:center;">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(nowISO())}</div>
+    </div>`;
+  const container = document.getElementById("voucher-print-only");
+  container.innerHTML = html;
+  document.body.classList.add("printing-voucher");
+  window.print();
 }
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("printing-voucher");
+  const c = document.getElementById("voucher-print-only");
+  if (c) c.innerHTML = "";
+});
 
 /* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
 function renderItemsAdmin(main) {

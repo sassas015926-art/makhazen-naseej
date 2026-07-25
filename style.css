@@ -116,6 +116,13 @@ tbody tr:nth-child(odd){background:var(--card);}
 
 .print-only{display:none;}
 .print-header{margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--ink);}
+#voucher-print-only{display:none;}
+
+@media print{
+  body.printing-voucher aside, body.printing-voucher .alert-banner, body.printing-voucher .topbar,
+  body.printing-voucher main{display:none !important;}
+  body.printing-voucher #voucher-print-only{display:block !important; padding:20px;}
+}
 
 @page{ size:A4; margin:1.4cm; }
 
