@@ -40,6 +40,7 @@ const I18N = {
   ar: {
     dir: "rtl", loginTitle: "تسجيل الدخول لإدارة المخازن", loginUser: "اسم المستخدم", loginPass: "كلمة المرور",
     loginBtn: "تسجيل الدخول", loginLoading: "...جارِ الدخول", loginError: "اسم المستخدم أو كلمة المرور غير صحيحة",
+    brandSub: "إدارة المخازن",
     navDashboard: "لوحة التحكم", navIn: "إدخال مخزون", navOut: "سحب من المخزن", navStock: "المخزون الحالي",
     navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات",
     navItems: "إدارة الأصناف",
@@ -55,6 +56,8 @@ const I18N = {
     statTotalItems: "إجمالي الأصناف", statCritical: "أصناف حرجة", statTodayIn: "عمليات إدخال اليوم", statTodayOut: "عمليات سحب اليوم",
     sectionUrgent: "أصناف تحتاج انتباه فوري", sectionRecentTx: "آخر الحركات",
     viewAllStock: "عرض كل المخزون", allReports: "كل التقارير", noLowStock: "لا توجد أصناف منخفضة حاليًا.", noTx: "لا توجد حركات مسجّلة بعد.",
+    chartMovement: "حركة المخزون — آخر 7 أيام", chartTopConsumed: "الأصناف الأكثر استهلاكًا",
+    legendIn: "إدخال", legendOut: "سحب", noData: "لا توجد بيانات كافية بعد.",
     // المخزون
     stockTitle: "المخزون الحالي", itemsRegistered: "صنف مسجّل بالمخزن", searchByNameCode: "ابحث بالاسم أو الكود...",
     // الإدخال/السحب
@@ -90,6 +93,7 @@ const I18N = {
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
     loginBtn: "Giriş Yap", loginLoading: "...Giriş yapılıyor", loginError: "Kullanıcı adı veya şifre hatalı",
+    brandSub: "Depo Yönetimi",
     navDashboard: "Kontrol Paneli", navIn: "Stok Girişi", navOut: "Depodan Çıkış", navStock: "Mevcut Stok",
     navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar",
     navItems: "Ürün Yönetimi",
@@ -105,6 +109,8 @@ const I18N = {
     statTotalItems: "Toplam Ürün", statCritical: "Kritik Ürünler", statTodayIn: "Bugünkü Girişler", statTodayOut: "Bugünkü Çıkışlar",
     sectionUrgent: "Acil Dikkat Gereken Ürünler", sectionRecentTx: "Son Hareketler",
     viewAllStock: "Tüm Stoku Görüntüle", allReports: "Tüm Raporlar", noLowStock: "Şu anda düşük stoklu ürün yok.", noTx: "Henüz kayıtlı hareket yok.",
+    chartMovement: "Stok Hareketi — Son 7 Gün", chartTopConsumed: "En Çok Tüketilen Ürünler",
+    legendIn: "Giriş", legendOut: "Çıkış", noData: "Henüz yeterli veri yok.",
     // Stok
     stockTitle: "Mevcut Stok", itemsRegistered: "kayıtlı ürün", searchByNameCode: "İsim veya kod ile ara...",
     // Giriş/Çıkış
@@ -145,7 +151,8 @@ function setLang(lang) {
   document.documentElement.lang = lang;
   applyLoginTexts();
   const logoutBtn = $("#logout-btn"); if (logoutBtn) logoutBtn.textContent = t("logout");
-  if (state.user) render();
+  const brandSubEl = $("#brand-sub"); if (brandSubEl) brandSubEl.textContent = t("brandSub");
+  if (state.user) { document.title = (state.settings.workshop_name || "مصنع نسيج") + " — " + t("brandSub"); render(); }
 }
 function applyLoginTexts() {
   const subEl = $("#login-sub"); if (subEl) subEl.textContent = t("loginTitle");
@@ -335,7 +342,8 @@ function applyBranding() {
   const logo = state.settings.logo_base64;
   $("#login-name").textContent = name;
   $("#brand-name").textContent = name;
-  document.title = name + " — إدارة المخزون";
+  document.title = name + " — " + t("brandSub");
+  const brandSubEl = $("#brand-sub"); if (brandSubEl) brandSubEl.textContent = t("brandSub");
   const loginLogo = $("#login-logo"), sideLogo = $("#side-logo");
   loginLogo.innerHTML = logo ? `<img src="${logo}">` : icon("scissors", 30);
   sideLogo.innerHTML = logo ? `<img src="${logo}">` : icon("scissors", 19);
@@ -396,6 +404,7 @@ function renderNav() {
 /* ---------------- render dispatcher ---------------- */
 function render() {
   renderNav();
+  renderBell();
   const critItems = state.items.filter(i => statusOf(i) === "critical");
   const banner = $("#alert-banner");
   if (critItems.length) {
@@ -415,6 +424,31 @@ function render() {
   else if (state.tab === "users") renderUsers(main);
   else if (state.tab === "settings") renderSettings(main);
 }
+
+/* ---------------- جرس الإشعارات ---------------- */
+function renderBell() {
+  const needsAttention = state.items.filter(i => statusOf(i) !== "ok").sort((a, b) => pctOf(a) - pctOf(b));
+  const badge = $("#bell-badge");
+  if (needsAttention.length) { badge.textContent = needsAttention.length; badge.classList.remove("hidden"); }
+  else badge.classList.add("hidden");
+
+  const dd = $("#bell-dropdown");
+  dd.innerHTML = `
+    <div class="bell-title">${needsAttention.length ? `🔔 يوجد ${needsAttention.length} صنف يحتاج شراء` : "لا توجد تنبيهات حاليًا"}</div>
+    ${needsAttention.length ? needsAttention.slice(0, 8).map(it => `
+      <div class="bell-item">
+        <span style="width:8px; height:8px; border-radius:50%; background:${STATUS_META[statusOf(it)].color}; flex-shrink:0;"></span>
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${it.name}</span>
+        <span class="mono" style="color:var(--ink70);">${Math.round(pctOf(it))}%</span>
+      </div>`).join("") : `<div class="bell-empty">كل الأصناف ضمن الحدود الآمنة.</div>`}
+    ${needsAttention.length > 8 ? `<div class="bell-empty">و${needsAttention.length - 8} أصناف أخرى...</div>` : ""}`;
+}
+document.addEventListener("click", (e) => {
+  const btn = document.getElementById("bell-btn"), dd = document.getElementById("bell-dropdown");
+  if (!btn || !dd) return;
+  if (btn.contains(e.target)) { dd.classList.toggle("hidden"); return; }
+  if (!dd.contains(e.target)) dd.classList.add("hidden");
+});
 
 /* ---------------- dashboard ---------------- */
 function renderDashboard(main) {
@@ -470,8 +504,65 @@ function renderDashboard(main) {
             </div>`).join("")}
         </div>`}
       </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+      <div class="card">
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("chartMovement")}</div>
+        <div id="movement-chart"></div>
+      </div>
+      <div class="card">
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("chartTopConsumed")}</div>
+        <div id="top-consumed-chart"></div>
+      </div>
     </div>`;
   $$("[data-goto]").forEach(b => b.onclick = () => { state.tab = b.dataset.goto; render(); });
+
+  // حركة المخزون آخر 7 أيام
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0); days.push(d); }
+  const dayTotals = days.map(d => {
+    const next = new Date(d); next.setDate(next.getDate() + 1);
+    const dayTx = tx.filter(x => { const dt = new Date(x.created_at); return dt >= d && dt < next; });
+    return {
+      label: d.toLocaleDateString("ar-EG", { weekday: "short" }),
+      inQty: dayTx.filter(x => x.type === "in").reduce((s, x) => s + Number(x.qty), 0),
+      outQty: dayTx.filter(x => x.type === "out").reduce((s, x) => s + Number(x.qty), 0),
+    };
+  });
+  const maxDay = Math.max(1, ...dayTotals.map(d => Math.max(d.inQty, d.outQty)));
+  $("#movement-chart").innerHTML = `
+    <div style="display:flex; align-items:flex-end; gap:8px; height:120px; margin-bottom:8px;">
+      ${dayTotals.map(d => `
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; height:100%; justify-content:flex-end;">
+          <div style="display:flex; align-items:flex-end; gap:2px; height:100%;">
+            <div style="width:9px; background:var(--green); border-radius:3px 3px 0 0; height:${Math.max(3, (d.inQty / maxDay) * 100)}%;" title="${t("legendIn")}: ${d.inQty}"></div>
+            <div style="width:9px; background:var(--red); border-radius:3px 3px 0 0; height:${Math.max(3, (d.outQty / maxDay) * 100)}%;" title="${t("legendOut")}: ${d.outQty}"></div>
+          </div>
+          <div style="font-size:10px; color:var(--ink50);">${d.label}</div>
+        </div>`).join("")}
+    </div>
+    <div style="display:flex; gap:14px; font-size:11.5px; color:var(--ink70);">
+      <span style="display:flex; align-items:center; gap:5px;"><span style="width:9px; height:9px; border-radius:3px; background:var(--green); display:inline-block;"></span>${t("legendIn")}</span>
+      <span style="display:flex; align-items:center; gap:5px;"><span style="width:9px; height:9px; border-radius:3px; background:var(--red); display:inline-block;"></span>${t("legendOut")}</span>
+    </div>`;
+
+  // الأصناف الأكثر استهلاكًا (أعلى 5)
+  const consMap = {};
+  tx.filter(x => x.type === "out").forEach(x => { consMap[x.item_name] = (consMap[x.item_name] || 0) + Number(x.qty); });
+  const topCons = Object.entries(consMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const maxCons = Math.max(1, ...topCons.map(c => c[1]));
+  $("#top-consumed-chart").innerHTML = topCons.length ? `
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      ${topCons.map(([name, val]) => `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:110px; font-size:12.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
+          <div style="flex:1; background:var(--paper-deep); border-radius:8px; height:14px; position:relative; overflow:hidden;">
+            <div style="position:absolute; inset:0; width:${(val / maxCons) * 100}%; background:var(--mustard); border-radius:8px;"></div>
+          </div>
+          <div class="mono" style="width:40px; font-size:12px; font-weight:700;">${val}</div>
+        </div>`).join("")}
+    </div>` : `<div class="empty-note">${t("noData")}</div>`;
 }
 
 /* ---------------- stock in / out ---------------- */
@@ -931,7 +1022,7 @@ function printVoucher(tx) {
     <div class="sig"><div class="sig-line">${isIn ? "المورد" : "المستلم"}</div></div>
     <div class="sig"><div class="sig-line">اعتماد المدير</div></div>
   </div>
-  <div class="footer">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخزون — ${fmtDate(nowISO())}</div>
+  <div class="footer">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(nowISO())}</div>
 </body></html>`;
   const win = window.open("", "_blank", "width=800,height=900");
   if (!win) { toast("المتصفح منع فتح نافذة الطباعة — اسمح بالنوافذ المنبثقة لهذا الموقع", true); return; }
