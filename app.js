@@ -69,6 +69,23 @@ const I18N = {
     printSectionsTitle: "أقسام التقرير المطلوب طباعتها/تصديرها", quickRange: "فترة سريعة", dateFrom: "من تاريخ", dateTo: "إلى تاريخ",
     typeAll: "الكل", typeIn: "إدخال فقط", typeOut: "سحب فقط", allItems: "كل الأصناف", clearFilters: "مسح الفلاتر",
     voucherBtn: "طباعة إذن",
+    // الإعدادات
+    settingsTitle: "الإعدادات", settingsSub: "اسم المصنع، الشعار، بيانات الاتصال، ونسب التنبيه",
+    factoryInfo: "بيانات المصنع", factoryName: "اسم المصنع", factoryLogo: "شعار المصنع",
+    factoryAddress: "عنوان المصنع", factoryPhone: "رقم الهاتف",
+    criticalPct: "نسبة التنبيه الحرج %", warningPct: 'نسبة تنبيه "منخفض" %', saveFactoryInfo: "حفظ بيانات المصنع",
+    itemsAdminTitle: "إدارة الأصناف", itemsAdminSub: "أنواع المنتجات (الفئات)، والأصناف تحت كل فئة",
+    categoriesTitle: "أنواع المنتجات (الفئات)", newCategoryPlaceholder: "اسم فئة جديدة، مثال: خامات تطريز",
+    itemsTitle: "الأصناف", newItemBtn: "صنف جديد", maxQty: "الحد الأقصى", currentQty: "الكمية الحالية",
+    // المستخدمون
+    usersTitle: "إدارة المستخدمين", usersSub: "إنشاء الحسابات، تحديد الصلاحيات، إيقاف أو حذف المستخدمين",
+    newUserBtn: "مستخدم جديد", fullNameLabel: "الاسم الكامل", roleLabel: "الدور",
+    lastLogin: "آخر دخول", deviceLabel: "الجهاز", activeLabel: "نشط", suspendedLabel: "موقوف", youLabel: "(أنت)",
+    // سجل العمليات
+    auditTitle: "سجل العمليات (Audit Log)", auditSub: "من قام بالعملية، وقتها، الجهاز، والكمية قبل وبعد التعديل",
+    actionCol: "العملية", entityCol: "الصنف / العنصر", beforeCol: "قبل", afterCol: "بعد", timeCol: "الوقت",
+    noAudit: "لا توجد عمليات مسجّلة بعد.",
+    usernameLabel: "اسم المستخدم (بالإنجليزي، بدون مسافات)", passwordLabel: "كلمة المرور", createAccountBtn: "إنشاء الحساب",
   },
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
@@ -102,6 +119,23 @@ const I18N = {
     printSectionsTitle: "Yazdırılacak/Aktarılacak Rapor Bölümleri", quickRange: "Hızlı Aralık", dateFrom: "Başlangıç Tarihi", dateTo: "Bitiş Tarihi",
     typeAll: "Tümü", typeIn: "Sadece Giriş", typeOut: "Sadece Çıkış", allItems: "Tüm Ürünler", clearFilters: "Filtreleri Temizle",
     voucherBtn: "Fiş Yazdır",
+    // Ayarlar
+    settingsTitle: "Ayarlar", settingsSub: "Fabrika adı, logo, iletişim bilgileri ve uyarı oranları",
+    factoryInfo: "Fabrika Bilgileri", factoryName: "Fabrika Adı", factoryLogo: "Fabrika Logosu",
+    factoryAddress: "Fabrika Adresi", factoryPhone: "Telefon Numarası",
+    criticalPct: "Kritik Uyarı Oranı %", warningPct: 'Düşük Uyarı Oranı %', saveFactoryInfo: "Fabrika Bilgilerini Kaydet",
+    itemsAdminTitle: "Ürün Yönetimi", itemsAdminSub: "Ürün türleri (kategoriler) ve her kategori altındaki ürünler",
+    categoriesTitle: "Ürün Türleri (Kategoriler)", newCategoryPlaceholder: "Yeni kategori adı, örn: Nakış Malzemeleri",
+    itemsTitle: "Ürünler", newItemBtn: "Yeni Ürün", maxQty: "Maksimum", currentQty: "Mevcut Miktar",
+    // Kullanıcılar
+    usersTitle: "Kullanıcı Yönetimi", usersSub: "Hesap oluşturma, yetki belirleme, kullanıcıları durdurma veya silme",
+    newUserBtn: "Yeni Kullanıcı", fullNameLabel: "Tam Ad", roleLabel: "Rol",
+    lastLogin: "Son Giriş", deviceLabel: "Cihaz", activeLabel: "Aktif", suspendedLabel: "Durduruldu", youLabel: "(Siz)",
+    // İşlem Kaydı
+    auditTitle: "İşlem Kaydı (Audit Log)", auditSub: "İşlemi kim yaptı, ne zaman, hangi cihazda ve değişiklik öncesi/sonrası miktar",
+    actionCol: "İşlem", entityCol: "Ürün / Öğe", beforeCol: "Önce", afterCol: "Sonra", timeCol: "Zaman",
+    noAudit: "Henüz kayıtlı işlem yok.",
+    usernameLabel: "Kullanıcı Adı (İngilizce, boşluksuz)", passwordLabel: "Şifre", createAccountBtn: "Hesap Oluştur",
   },
 };
 function t(key) { return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ar[key] || key; }
@@ -797,12 +831,12 @@ function renderReports(main) {
 /* ---------------- settings (branding + categories + items) ---------------- */
 function renderSettings(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">الإعدادات</div><div class="section-sub">اسم المصنع، الشعار، بيانات الاتصال، ونسب التنبيه</div></div></div>
+    <div class="section-header"><div><div class="section-title">${t("settingsTitle")}</div><div class="section-sub">${t("settingsSub")}</div></div></div>
     <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">بيانات المصنع</div>
-      <div class="field"><label>اسم المصنع</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
+      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("factoryInfo")}</div>
+      <div class="field"><label>${t("factoryName")}</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
       <div class="field">
-        <label>شعار المصنع</label>
+        <label>${t("factoryLogo")}</label>
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="width:52px; height:52px; border-radius:12px; background:var(--mustard); display:flex; align-items:center; justify-content:center; overflow:hidden;">
             ${state.settings.logo_base64 ? `<img src="${state.settings.logo_base64}" style="width:100%; height:100%; object-fit:cover;">` : icon("scissors", 24)}
@@ -811,14 +845,14 @@ function renderSettings(main) {
         </div>
       </div>
       <div style="display:flex; gap:10px;">
-        <div class="field" style="flex:1;"><label>عنوان المصنع</label><input id="ws-address" class="input" style="width:100%;" value="${state.settings.address || ""}"></div>
-        <div class="field" style="flex:1;"><label>رقم الهاتف</label><input id="ws-phone" class="input" style="width:100%;" value="${state.settings.phone || ""}"></div>
+        <div class="field" style="flex:1;"><label>${t("factoryAddress")}</label><input id="ws-address" class="input" style="width:100%;" value="${state.settings.address || ""}"></div>
+        <div class="field" style="flex:1;"><label>${t("factoryPhone")}</label><input id="ws-phone" class="input" style="width:100%;" value="${state.settings.phone || ""}"></div>
       </div>
       <div style="display:flex; gap:10px;">
-        <div class="field" style="flex:1;"><label>نسبة التنبيه الحرج %</label><input id="ws-crit" type="number" min="1" max="90" class="input mono" style="width:100%;" value="${state.settings.alert_threshold_percent || 15}"></div>
-        <div class="field" style="flex:1;"><label>نسبة تنبيه "منخفض" %</label><input id="ws-warn" type="number" min="1" max="95" class="input mono" style="width:100%;" value="${state.settings.warning_threshold_percent || 30}"></div>
+        <div class="field" style="flex:1;"><label>${t("criticalPct")}</label><input id="ws-crit" type="number" min="1" max="90" class="input mono" style="width:100%;" value="${state.settings.alert_threshold_percent || 15}"></div>
+        <div class="field" style="flex:1;"><label>${t("warningPct")}</label><input id="ws-warn" type="number" min="1" max="95" class="input mono" style="width:100%;" value="${state.settings.warning_threshold_percent || 30}"></div>
       </div>
-      <button class="btn-primary" id="ws-save">حفظ بيانات المصنع</button>
+      <button class="btn-primary" id="ws-save">${t("saveFactoryInfo")}</button>
     </div>`;
 
   let logoData = state.settings.logo_base64 || null;
@@ -909,21 +943,21 @@ function printVoucher(tx) {
 /* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
 function renderItemsAdmin(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">إدارة الأصناف</div><div class="section-sub">أنواع المنتجات (الفئات)، والأصناف تحت كل فئة</div></div></div>
+    <div class="section-header"><div><div class="section-title">${t("itemsAdminTitle")}</div><div class="section-sub">${t("itemsAdminSub")}</div></div></div>
 
     <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">أنواع المنتجات (الفئات)</div>
+      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("categoriesTitle")}</div>
       <div id="cat-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px;">
-        <input id="new-cat" class="input" style="flex:1;" placeholder="اسم فئة جديدة، مثال: خامات تطريز">
-        <button class="btn-dark" id="add-cat">${icon("plus", 14)} إضافة</button>
+        <input id="new-cat" class="input" style="flex:1;" placeholder="${t("newCategoryPlaceholder")}">
+        <button class="btn-dark" id="add-cat">${icon("plus", 14)} ${t("add")}</button>
       </div>
     </div>
 
-    <div class="section-header"><div style="font-weight:800; font-size:16px;">الأصناف</div>
-      <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} صنف جديد</button></div>
+    <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
+      <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الكود</th><th>الصنف</th><th>الفئة</th><th>الوحدة</th><th>الكمية الحالية</th><th>الحد الأقصى</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
+      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
   const drawCats = () => {
@@ -971,15 +1005,15 @@ function renderUsers(main) {
   const roleLabels = ROLE_LABELS;
   main.innerHTML = `
     <div class="section-header">
-      <div><div class="section-title">إدارة المستخدمين</div><div class="section-sub">إنشاء الحسابات، تحديد الصلاحيات، إيقاف أو حذف المستخدمين</div></div>
-      <button class="btn-dark" id="new-user-btn">${icon("plus", 15)} مستخدم جديد</button>
+      <div><div class="section-title">${t("usersTitle")}</div><div class="section-sub">${t("usersSub")}</div></div>
+      <button class="btn-dark" id="new-user-btn">${icon("plus", 15)} ${t("newUserBtn")}</button>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th>الجهاز</th><th></th></tr></thead><tbody id="users-body"></tbody></table>
+      <table><thead><tr><th>${t("fullNameLabel")}</th><th>${t("roleLabel")}</th><th>${t("status")}</th><th>${t("lastLogin")}</th><th>${t("deviceLabel")}</th><th></th></tr></thead><tbody id="users-body"></tbody></table>
     </div>`;
   $("#users-body").innerHTML = state.profiles.map(p => `
     <tr>
-      <td style="font-weight:700;">${p.full_name || "—"}${p.id === state.user.id ? ' <span style="color:var(--ink50); font-size:11px;">(أنت)</span>' : ""}</td>
+      <td style="font-weight:700;">${p.full_name || "—"}${p.id === state.user.id ? ` <span style="color:var(--ink50); font-size:11px;">${t("youLabel")}</span>` : ""}</td>
       <td>
         <select class="input" style="padding:6px 10px; font-size:12.5px;" data-role="${p.id}" ${p.id === state.user.id ? "disabled" : ""}>
           ${Object.entries(roleLabels).map(([val, label]) => `<option value="${val}" ${p.role === val ? "selected" : ""}>${label}</option>`).join("")}
@@ -987,7 +1021,7 @@ function renderUsers(main) {
       </td>
       <td>
         <button data-toggle="${p.id}" ${p.id === state.user.id ? "disabled" : ""} class="pill ${p.is_active !== false ? "pill-ok" : "pill-critical"}" style="border:none; cursor:${p.id === state.user.id ? "default" : "pointer"};">
-          ${p.is_active !== false ? "نشط" : "موقوف"}
+          ${p.is_active !== false ? t("activeLabel") : t("suspendedLabel")}
         </button>
       </td>
       <td style="color:var(--ink70); font-size:12.5px;" class="mono">${p.last_login ? fmtDate(p.last_login) : "—"}</td>
@@ -1044,18 +1078,18 @@ function openNewUserModal(main) {
   overlay.innerHTML = `
     <div class="modal-box">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <div style="font-weight:800; font-size:16px;">مستخدم جديد</div>
+        <div style="font-weight:800; font-size:16px;">${t("newUserBtn")}</div>
         <button class="close-x" id="nu-close">${icon("x", 15)}</button>
       </div>
-      <div class="field"><label>اسم المستخدم (بالإنجليزي، بدون مسافات)</label><input id="nu-username" class="input" style="width:100%;" placeholder="مثال: sara"></div>
-      <div class="field"><label>الاسم الكامل</label><input id="nu-fullname" class="input" style="width:100%;" placeholder="مثال: سارة أحمد"></div>
-      <div class="field"><label>كلمة المرور</label><input id="nu-password" type="password" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
-      <div class="field"><label>الدور</label>
+      <div class="field"><label>${t("usernameLabel")}</label><input id="nu-username" class="input" style="width:100%;" placeholder="مثال: sara"></div>
+      <div class="field"><label>${t("fullNameLabel")}</label><input id="nu-fullname" class="input" style="width:100%;" placeholder="مثال: سارة أحمد"></div>
+      <div class="field"><label>${t("passwordLabel")}</label><input id="nu-password" type="password" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
+      <div class="field"><label>${t("roleLabel")}</label>
         <select id="nu-role" class="input" style="width:100%;">
           ${Object.entries(roleLabels).map(([val, label]) => `<option value="${val}" ${val === "keeper" ? "selected" : ""}>${label}</option>`).join("")}
         </select>
       </div>
-      <button class="btn-primary" id="nu-save">إنشاء الحساب</button>
+      <button class="btn-primary" id="nu-save">${t("createAccountBtn")}</button>
     </div>`;
   document.body.appendChild(overlay);
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -1081,9 +1115,9 @@ function openNewUserModal(main) {
 /* ---------------- audit log view ---------------- */
 function renderAudit(main) {
   main.innerHTML = `
-    <div class="section-header"><div><div class="section-title">سجل العمليات (Audit Log)</div><div class="section-sub">من قام بالعملية، وقتها، الجهاز، والكمية قبل وبعد التعديل</div></div></div>
+    <div class="section-header"><div><div class="section-title">${t("auditTitle")}</div><div class="section-sub">${t("auditSub")}</div></div></div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>المستخدم</th><th>العملية</th><th>الصنف / العنصر</th><th>قبل</th><th>بعد</th><th>الجهاز</th><th>الوقت</th></tr></thead><tbody id="audit-body"></tbody></table>
+      <table><thead><tr><th>${t("fullNameLabel")}</th><th>${t("actionCol")}</th><th>${t("entityCol")}</th><th>${t("beforeCol")}</th><th>${t("afterCol")}</th><th>${t("deviceLabel")}</th><th>${t("timeCol")}</th></tr></thead><tbody id="audit-body"></tbody></table>
     </div>`;
   $("#audit-body").innerHTML = state.auditLog.length ? state.auditLog.map(a => `
     <tr>
@@ -1094,7 +1128,7 @@ function renderAudit(main) {
       <td class="mono">${a.qty_after ?? "—"}</td>
       <td style="color:var(--ink70); font-size:12px;">${a.device || "—"}</td>
       <td class="mono" style="color:var(--ink70); font-size:12px;">${fmtDate(a.created_at)}</td>
-    </tr>`).join("") : `<tr><td colspan="7"><div class="empty-note">لا توجد عمليات مسجّلة بعد.</div></td></tr>`;
+    </tr>`).join("") : `<tr><td colspan="7"><div class="empty-note">${t("noAudit")}</div></td></tr>`;
 }
 
 function genItemCode(category) {
