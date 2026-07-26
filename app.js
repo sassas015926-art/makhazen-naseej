@@ -457,6 +457,15 @@ document.addEventListener("click", (e) => {
   if (!dd.contains(e.target)) dd.classList.add("hidden");
 });
 
+// مستمع عام لزر "طباعة إذن" — مستقل عن أي إعادة رسم للجدول، عشان يشتغل دايمًا مهما اتغيّر الفلتر
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-voucher]");
+  if (!btn) return;
+  const tx = state.transactions.find(x => x.id === btn.dataset.voucher);
+  if (!tx) { toast("تعذر إيجاد بيانات هذه الحركة", true); return; }
+  printVoucher(tx);
+});
+
 /* ---------------- dashboard ---------------- */
 function renderDashboard(main) {
   const items = state.items, tx = state.transactions;
@@ -854,10 +863,7 @@ function renderReports(main) {
       <td class="mono">${t.qty} ${t.unit || ""}</td><td>${t.worker || "—"}</td><td style="color:var(--ink70);">${t.note || "—"}</td>
       <td class="mono" style="color:var(--ink70);">${fmtDate(t.created_at)}</td>
       <td class="no-print"><button class="icon-btn" data-voucher="${t.id}" title="${voucherLabel}">${icon("history", 13)}</button></td></tr>`).join("") : `<tr><td colspan="7"><div class="empty-note">لا توجد حركات ضمن هذا الفلتر.</div></td></tr>`;
-    $$("[data-voucher]").forEach(b => b.onclick = () => {
-      const tx = state.transactions.find(x => x.id === b.dataset.voucher);
-      if (tx) printVoucher(tx);
-    });
+    // ملحوظة: التعامل مع نقر زر الطباعة بيتم عن طريق مستمع عام (event delegation) في نهاية الملف
     return filtered;
   };
   let currentFiltered = drawTx();
@@ -1088,16 +1094,43 @@ function printVoucher(tx) {
       </div>
       <div style="margin-top:40px; font-size:10.5px; color:#999; text-align:center;">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(nowISO())}</div>
     </div>`;
-  const container = document.getElementById("voucher-print-only");
-  container.innerHTML = html;
-  document.body.classList.add("voucher-mode");
-  window.print();
+
+  const fullDoc = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>${title} - ${voucherNo}</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; }
+  body { margin: 0; }
+  @media print { @page { margin: 12mm; } }
+</style></head><body>${html}</body></html>`;
+
+  try {
+    let frame = document.getElementById("voucher-print-frame");
+    if (frame) frame.remove();
+    frame = document.createElement("iframe");
+    frame.id = "voucher-print-frame";
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+
+    const doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(fullDoc);
+    doc.close();
+
+    // ملحوظة مهمة: حدث onload لا يُطلَق بشكل موثوق للـ iframe اللي محتواه اتكتب بـ document.write
+    // (ده كان سبب المشكلة الأصلية)، فبننادي الطباعة مباشرة بعد doc.close() بدل ما ننتظر onload
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+    // تنظيف الإطار المخفي بعد فترة كافية لإتمام الطباعة
+    setTimeout(() => { const f = document.getElementById("voucher-print-frame"); if (f) f.remove(); }, 3000);
+  } catch (e) {
+    toast("تعذّرت طباعة الإذن: " + e.message, true);
+  }
 }
-window.addEventListener("afterprint", () => {
-  document.body.classList.remove("voucher-mode");
-  const c = document.getElementById("voucher-print-only");
-  if (c) c.innerHTML = "";
-});
 
 /* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
 function renderItemsAdmin(main) {
@@ -1113,11 +1146,94 @@ function renderItemsAdmin(main) {
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:18px; max-width:560px;">
+      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">استيراد أصناف من Excel</div>
+      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">ملف واحد يضيف مئات الأصناف دفعة واحدة. الأعمدة المطلوبة: <b>اسم الصنف</b>، <b>الفئة</b>، <b>الوحدة</b>، <b>الكمية</b>، <b>الحد الأقصى</b> (والكود والباركود اختياريان).</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button class="btn-dark" id="download-template">${icon("download", 14)} تنزيل قالب Excel فارغ</button>
+        <label class="btn-dark" style="cursor:pointer;">${icon("plus", 14)} اختيار ملف Excel
+          <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none;">
+        </label>
+      </div>
+      <div id="import-status" style="margin-top:12px; font-size:12.5px;"></div>
+    </div>
+
     <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
+
+  $("#download-template").onclick = () => {
+    const wb = XLSX.utils.book_new();
+    const sample = [{ "اسم الصنف": "قماش قطن أبيض", "الفئة": "أقمشة", "الوحدة": "متر", "الكمية": 50, "الحد الأقصى": 200, "الكود": "", "الباركود": "" }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sample), "أصناف");
+    XLSX.writeFile(wb, "قالب_استيراد_الأصناف.xlsx");
+  };
+
+  $("#import-file").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = $("#import-status");
+    statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ قراءة الملف</span>`;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+      const colVal = (row, ...keys) => { for (const k of keys) if (row[k] !== undefined && row[k] !== "") return row[k]; return ""; };
+      const validRows = [];
+      const skipped = [];
+      const newCats = new Set();
+
+      rows.forEach((row, idx) => {
+        const name = String(colVal(row, "اسم الصنف", "الصنف", "name")).trim();
+        const category = String(colVal(row, "الفئة", "category")).trim() || (state.categories[0] || "أخرى");
+        const unit = String(colVal(row, "الوحدة", "unit")).trim() || "قطعة";
+        const qty = Number(colVal(row, "الكمية", "qty")) || 0;
+        const maxQty = Number(colVal(row, "الحد الأقصى", "max_qty")) || 0;
+        const code = String(colVal(row, "الكود", "code")).trim();
+        const barcode = String(colVal(row, "الباركود", "barcode")).trim();
+        if (!name || !maxQty) { skipped.push(idx + 2); return; }
+        if (!state.categories.includes(category)) newCats.add(category);
+        validRows.push({ name, category, unit, qty, max_qty: maxQty, code: code || null, barcode: barcode || null });
+      });
+
+      if (!validRows.length) { statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">لا توجد صفوف صالحة للاستيراد (تأكد من عمودي "اسم الصنف" و"الحد الأقصى").</span>`; e.target.value = ""; return; }
+
+      statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ استيراد ${validRows.length} صنف</span>`;
+
+      // إضافة أي فئات جديدة واردة في الملف قبل استيراد الأصناف
+      for (const cat of newCats) { await sb.from("categories").insert({ name: cat }).select(); }
+      if (newCats.size) await loadCategories();
+
+      // توليد أكواد تلقائية لأي صف من غير كود (بعداد محلي عشان مانكررش نفس الكود لأصناف بنفس الفئة في نفس الملف)
+      const localCounters = {};
+      validRows.forEach(r => {
+        if (r.code) return;
+        const base = genItemCode(r.category); // يرجع مثلاً FAB-0007 بناءً على الأصناف الموجودة فعلاً
+        const prefix = base.split("-")[0];
+        if (!(prefix in localCounters)) localCounters[prefix] = parseInt(base.split("-")[1], 10);
+        else localCounters[prefix]++;
+        r.code = `${prefix}-${String(localCounters[prefix]).padStart(4, "0")}`;
+      });
+
+      const { error } = await sb.from("items").insert(validRows);
+      if (error) {
+        statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">تعذر الاستيراد: ${error.message}</span>`;
+      } else {
+        logAudit({ action: "استيراد أصناف من Excel", entity: "item", details: `تم استيراد ${validRows.length} صنف` });
+        statusEl.innerHTML = `<span style="color:var(--green); font-weight:700;">✔ تم استيراد ${validRows.length} صنف بنجاح${skipped.length ? ` — تم تجاهل ${skipped.length} صف ناقص البيانات (السطور: ${skipped.slice(0, 10).join("، ")}${skipped.length > 10 ? "..." : ""})` : ""}</span>`;
+        await loadItems();
+        renderItemsAdmin(main);
+        toast(`تم استيراد ${validRows.length} صنف`);
+      }
+    } catch (err) {
+      statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">تعذرت قراءة الملف: ${err.message}</span>`;
+    }
+    e.target.value = "";
+  };
 
   const drawCats = () => {
     $("#cat-chips").innerHTML = state.categories.map(c => `<span class="chip">${c}<button data-cat="${c}">${icon("x", 12)}</button></span>`).join("");

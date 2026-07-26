@@ -116,7 +116,6 @@ tbody tr:nth-child(odd){background:var(--card);}
 
 .print-only{display:none;}
 .print-header{margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--ink);}
-#voucher-print-only{display:none;}
 
 @page{ size:A4; margin:1.4cm; }
 
@@ -126,10 +125,6 @@ tbody tr:nth-child(odd){background:var(--card);}
   main{overflow:visible !important;}
   .print-only{display:block !important;}
   .print-exclude{display:none !important;}
-
-  /* وضع طباعة إذن صرف/استلام: إخفاء كل حاجة تانية وإظهار الإذن بس */
-  body.voucher-mode main, body.voucher-mode .topbar{display:none !important;}
-  body.voucher-mode #voucher-print-only{display:block !important;}
 
   /* بطاقات قصيرة (زي كارت الملخص أو معلومات صغيرة) منعها من الانقسام بين صفحتين */
   .card{box-shadow:none !important; border:1px solid #ccc !important; margin-bottom:14px !important;}
