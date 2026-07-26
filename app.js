@@ -32,7 +32,7 @@ const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "�
 const state = {
   user: null, profile: null,
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
-  categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [],
+  categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [], suppliers: [],
   tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), pendingItemFilter: null,
 };
 
@@ -89,6 +89,12 @@ const I18N = {
     actionCol: "العملية", entityCol: "الصنف / العنصر", beforeCol: "قبل", afterCol: "بعد", timeCol: "الوقت",
     noAudit: "لا توجد عمليات مسجّلة بعد.",
     usernameLabel: "اسم المستخدم (بالإنجليزي، بدون مسافات)", passwordLabel: "كلمة المرور", createAccountBtn: "إنشاء الحساب",
+    // الموردون
+    suppliersTitle: "الموردون", suppliersSub: "بيانات الموردين للتواصل السريع والربط بالأصناف",
+    newSupplierBtn: "مورد جديد", supplierName: "اسم المورد", supplierPhone: "الهاتف", supplierEmail: "البريد الإلكتروني",
+    supplierNotes: "ملاحظات", noSuppliers: "لا يوجد موردون مسجّلون بعد.",
+    // حقول الصنف الموسّعة
+    itemSupplier: "المورد", itemPrice: "السعر", itemStorage: "مكان التخزين", itemImage: "صورة الصنف", noneOption: "بدون",
   },
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
@@ -142,6 +148,10 @@ const I18N = {
     actionCol: "İşlem", entityCol: "Ürün / Öğe", beforeCol: "Önce", afterCol: "Sonra", timeCol: "Zaman",
     noAudit: "Henüz kayıtlı işlem yok.",
     usernameLabel: "Kullanıcı Adı (İngilizce, boşluksuz)", passwordLabel: "Şifre", createAccountBtn: "Hesap Oluştur",
+    suppliersTitle: "Tedarikçiler", suppliersSub: "Hızlı iletişim ve ürünlerle ilişkilendirme için tedarikçi bilgileri",
+    newSupplierBtn: "Yeni Tedarikçi", supplierName: "Tedarikçi Adı", supplierPhone: "Telefon", supplierEmail: "E-posta",
+    supplierNotes: "Notlar", noSuppliers: "Henüz kayıtlı tedarikçi yok.",
+    itemSupplier: "Tedarikçi", itemPrice: "Fiyat", itemStorage: "Depolama Yeri", itemImage: "Ürün Görseli", noneOption: "Yok",
   },
 };
 function t(key) { return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ar[key] || key; }
@@ -310,9 +320,13 @@ async function loadBackups() {
   const { data } = await sb.from("backups").select("id, created_at, created_by").order("created_at", { ascending: false }).limit(10);
   state.backups = data || [];
 }
+async function loadSuppliers() {
+  const { data } = await sb.from("suppliers").select("*").order("name");
+  state.suppliers = data || [];
+}
 async function loadAll() {
   await Promise.all([loadSettings(), loadCategories(), loadItems(), loadTransactions(), loadProfile()]);
-  await Promise.all([loadProfiles(), loadAuditLog()]);
+  await Promise.all([loadProfiles(), loadAuditLog(), loadSuppliers()]);
 }
 
 /* ---------------- app boot ---------------- */
@@ -402,6 +416,7 @@ function renderNav() {
     state.tab = b.dataset.tab; state.selectedItem = null;
     if (state.tab === "audit") await loadAuditLog();
     if (state.tab === "users") await loadProfiles();
+    if (state.tab === "suppliers") await loadSuppliers();
     render();
   });
   const roleTag = $("#who-role"); if (roleTag) roleTag.textContent = ROLE_LABELS[myRole()] || "";
@@ -1092,7 +1107,7 @@ function printVoucher(tx) {
         <div style="width:30%; text-align:center;"><div style="border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;">${isIn ? "المورد" : "المستلم"}</div></div>
         <div style="width:30%; text-align:center;"><div style="border-top:1px solid #333; margin-top:50px; padding-top:6px; font-size:12.5px; color:#444;">اعتماد المدير</div></div>
       </div>
-      <div style="margin-top:40px; font-size:10.5px; color:#999; text-align:center;">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(nowISO())}</div>
+      <div style="margin-top:40px; font-size:10.5px; color:#999; text-align:center;">تم إنشاء هذا الإذن تلقائيًا بواسطة نظام إدارة المخازن — ${fmtDate(new Date().toISOString())}</div>
     </div>`;
 
   const fullDoc = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
@@ -1146,11 +1161,28 @@ function renderItemsAdmin(main) {
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:18px; max-width:560px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">استيراد أصناف من Excel</div>
-      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">ملف واحد يضيف مئات الأصناف دفعة واحدة. الأعمدة المطلوبة: <b>اسم الصنف</b>، <b>الفئة</b>، <b>الوحدة</b>، <b>الكمية</b>، <b>الحد الأقصى</b> (والكود والباركود اختياريان).</div>
+    <div class="card" style="margin-bottom:18px; max-width:620px;">
+      <div style="font-weight:800; font-size:15px; margin-bottom:10px;">استيراد أصناف من Excel</div>
+      <div style="font-size:12.5px; color:var(--ink70); margin-bottom:10px;">بيضيف مئات الأصناف دفعة واحدة من ملف Excel. اتبع الخطوات بالترتيب:</div>
+      <ol style="font-size:12.5px; color:var(--ink70); margin:0 0 14px; padding-right:20px; line-height:2;">
+        <li>اضغط <b>"تنزيل قالب Excel"</b> تحت — هيوصلك ملف فيه صف مثال (اسمه واضح "مثال — احذفه") + شيت تعليمات.</li>
+        <li>افتح الملف، احذف صف المثال، واكتب بيانات أصنافك الحقيقية بنفس ترتيب الأعمدة.</li>
+        <li>احفظ الملف، وارفعه بزرار <b>"اختيار ملف Excel"</b> تحت.</li>
+      </ol>
+      <div style="background:var(--paper-deep); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:12px;">
+        <b>الأعمدة المطلوبة بالظبط (بنفس الأسماء):</b>
+        <ul style="margin:8px 0 0; padding-right:18px; line-height:1.9;">
+          <li><b>اسم الصنف</b> — إجباري</li>
+          <li><b>الفئة</b> — إجباري (لو الفئة مش موجودة عندك، هتتضاف تلقائيًا)</li>
+          <li><b>الوحدة</b> — إجباري (مثال: متر، قطعة، بكرة)</li>
+          <li><b>الكمية</b> — إجباري (رقم)</li>
+          <li><b>الحد الأقصى</b> — إجباري (رقم، أساس حساب نسبة التنبيه)</li>
+          <li><b>الكود</b> — اختياري (لو سايبه فاضي هيتولّد تلقائيًا)</li>
+          <li><b>الباركود</b> — اختياري</li>
+        </ul>
+      </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <button class="btn-dark" id="download-template">${icon("download", 14)} تنزيل قالب Excel فارغ</button>
+        <button class="btn-dark" id="download-template">${icon("download", 14)} تنزيل قالب Excel</button>
         <label class="btn-dark" style="cursor:pointer;">${icon("plus", 14)} اختيار ملف Excel
           <input type="file" id="import-file" accept=".xlsx,.xls" style="display:none;">
         </label>
@@ -1161,13 +1193,28 @@ function renderItemsAdmin(main) {
     <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
     <div class="card" style="padding:0; overflow:hidden;">
-      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
+      <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th>${t("itemSupplier")}</th><th>${t("itemStorage")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
   $("#download-template").onclick = () => {
     const wb = XLSX.utils.book_new();
-    const sample = [{ "اسم الصنف": "قماش قطن أبيض", "الفئة": "أقمشة", "الوحدة": "متر", "الكمية": 50, "الحد الأقصى": 200, "الكود": "", "الباركود": "" }];
+
+    const instructions = [
+      { "التعليمات": "1. احذف صف المثال في شيت (أصناف) قبل إدخال بياناتك." },
+      { "التعليمات": "2. لازم تكتب بيانات كل صنف في صف مستقل تحت صف العناوين." },
+      { "التعليمات": "3. الأعمدة الإجبارية: اسم الصنف، الفئة، الوحدة، الكمية، الحد الأقصى." },
+      { "التعليمات": "4. الكود والباركود اختياريان — لو سايبهم فاضيين هيتولدوا تلقائيًا." },
+      { "التعليمات": "5. لو الفئة اللي كتبتها مش موجودة في النظام، هتتضاف تلقائيًا وقت الاستيراد." },
+      { "التعليمات": "6. احفظ الملف بصيغة xlsx وارفعه من زرار (اختيار ملف Excel) في صفحة إدارة الأصناف." },
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(instructions), "تعليمات");
+
+    const sample = [
+      { "اسم الصنف": "مثال — احذف هذا الصف", "الفئة": "أقمشة", "الوحدة": "متر", "الكمية": 50, "الحد الأقصى": 200, "الكود": "", "الباركود": "" },
+      { "اسم الصنف": "خيط بوليستر أسود", "الفئة": "خيوط", "الوحدة": "بكرة", "الكمية": 30, "الحد الأقصى": 100, "الكود": "", "الباركود": "" },
+    ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sample), "أصناف");
+
     XLSX.writeFile(wb, "قالب_استيراد_الأصناف.xlsx");
   };
 
@@ -1189,6 +1236,7 @@ function renderItemsAdmin(main) {
 
       rows.forEach((row, idx) => {
         const name = String(colVal(row, "اسم الصنف", "الصنف", "name")).trim();
+        if (name.includes("مثال") && name.includes("احذف")) return; // تجاهل صف المثال لو نسي المستخدم يحذفه
         const category = String(colVal(row, "الفئة", "category")).trim() || (state.categories[0] || "أخرى");
         const unit = String(colVal(row, "الوحدة", "unit")).trim() || "قطعة";
         const qty = Number(colVal(row, "الكمية", "qty")) || 0;
@@ -1258,6 +1306,8 @@ function renderItemsAdmin(main) {
     $("#items-body").innerHTML = state.items.map(it => `
       <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td><td style="font-weight:700;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
       <td class="mono">${it.qty}</td><td class="mono">${it.max_qty}</td>
+      <td style="color:var(--ink70); font-size:12.5px;">${(state.suppliers.find(s => s.id === it.supplier_id) || {}).name || "—"}</td>
+      <td style="color:var(--ink70); font-size:12.5px;">${it.storage_location || "—"}</td>
       <td><div style="display:flex; gap:8px; justify-content:flex-end;">
         <button class="icon-btn" data-edit="${it.id}">${icon("pencil", 14)}</button>
         <button class="icon-btn" style="color:var(--red);" data-del="${it.id}">${icon("trash", 14)}</button>
@@ -1273,6 +1323,82 @@ function renderItemsAdmin(main) {
   };
   drawItems();
   $("#new-item-btn").onclick = () => openItemModal(null);
+}
+
+/* ---------------- الموردون (المدير وأمين المخزن) ---------------- */
+function renderSuppliers(main) {
+  main.innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">${t("suppliersTitle")}</div><div class="section-sub">${t("suppliersSub")}</div></div>
+      <button class="btn-dark" id="new-supplier-btn">${icon("plus", 15)} ${t("newSupplierBtn")}</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table><thead><tr><th>${t("supplierName")}</th><th>${t("supplierPhone")}</th><th>${t("supplierEmail")}</th><th>${t("supplierNotes")}</th><th></th></tr></thead><tbody id="suppliers-body"></tbody></table>
+    </div>`;
+
+  const draw = () => {
+    $("#suppliers-body").innerHTML = state.suppliers.length ? state.suppliers.map(s => `
+      <tr>
+        <td style="font-weight:700;">${s.name}</td>
+        <td class="mono">${s.phone || "—"}</td>
+        <td>${s.email || "—"}</td>
+        <td style="color:var(--ink70);">${s.notes || "—"}</td>
+        <td><div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="icon-btn" data-edit-sup="${s.id}">${icon("pencil", 14)}</button>
+          <button class="icon-btn" style="color:var(--red);" data-del-sup="${s.id}">${icon("trash", 14)}</button>
+        </div></td>
+      </tr>`).join("") : `<tr><td colspan="5"><div class="empty-note">${t("noSuppliers")}</div></td></tr>`;
+    $$("[data-edit-sup]").forEach(b => b.onclick = () => openSupplierModal(state.suppliers.find(s => s.id === b.dataset.editSup), main));
+    $$("[data-del-sup]").forEach(b => b.onclick = async () => {
+      const s = state.suppliers.find(x => x.id === b.dataset.delSup);
+      if (!confirm(`حذف المورد "${s.name}"؟`)) return;
+      await sb.from("suppliers").delete().eq("id", s.id);
+      logAudit({ action: "حذف مورد", entity: "supplier", entityName: s.name });
+      await loadSuppliers(); draw();
+      toast("تم حذف المورد");
+    });
+  };
+  draw();
+  $("#new-supplier-btn").onclick = () => openSupplierModal(null, main);
+}
+
+function openSupplierModal(existing, main) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  const form = existing ? { ...existing } : { name: "", phone: "", email: "", notes: "" };
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">${existing ? t("edit") : t("newSupplierBtn")}</div>
+        <button class="close-x" id="sup-close">${icon("x", 15)}</button>
+      </div>
+      <div class="field"><label>${t("supplierName")}</label><input id="sup-name" class="input" style="width:100%;" value="${form.name}"></div>
+      <div class="field"><label>${t("supplierPhone")}</label><input id="sup-phone" class="input" style="width:100%;" value="${form.phone || ""}"></div>
+      <div class="field"><label>${t("supplierEmail")}</label><input id="sup-email" class="input" style="width:100%;" value="${form.email || ""}"></div>
+      <div class="field"><label>${t("supplierNotes")}</label><input id="sup-notes" class="input" style="width:100%;" value="${form.notes || ""}"></div>
+      <button class="btn-primary" id="sup-save">${t("save")}</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#sup-close", overlay).onclick = () => overlay.remove();
+  $("#sup-save", overlay).onclick = async () => {
+    const payload = {
+      name: $("#sup-name", overlay).value.trim(),
+      phone: $("#sup-phone", overlay).value.trim(),
+      email: $("#sup-email", overlay).value.trim(),
+      notes: $("#sup-notes", overlay).value.trim(),
+    };
+    if (!payload.name) { toast("أدخل اسم المورد", true); return; }
+    let error;
+    if (existing) ({ error } = await sb.from("suppliers").update(payload).eq("id", existing.id));
+    else ({ error } = await sb.from("suppliers").insert(payload));
+    if (error) { toast("تعذر حفظ بيانات المورد", true); return; }
+    logAudit({ action: existing ? "تعديل مورد" : "إضافة مورد", entity: "supplier", entityName: payload.name });
+    overlay.remove();
+    await loadSuppliers();
+    renderSuppliers(main);
+    toast(existing ? "تم تحديث بيانات المورد" : "تمت إضافة المورد");
+  };
 }
 
 /* ---------------- user management (admin only) ---------------- */
@@ -1446,6 +1572,26 @@ function openItemModal(existing, prefillName, onDone) {
         <div class="field" style="flex:1;"><label>الحد الأقصى للمخزون</label><input id="f-max" type="number" class="input mono" style="width:100%;" value="${form.max_qty}"></div>
       </div>
       <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label>${t("itemSupplier")}</label>
+          <select id="f-supplier" class="input" style="width:100%;">
+            <option value="">${t("noneOption")}</option>
+            ${state.suppliers.map(s => `<option value="${s.id}" ${form.supplier_id === s.id ? "selected" : ""}>${s.name}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field" style="flex:1;"><label>${t("itemPrice")}</label><input id="f-price" type="number" step="0.01" class="input mono" style="width:100%;" value="${form.price ?? ""}"></div>
+      </div>
+      <div class="field"><label>${t("itemStorage")}</label><input id="f-storage" class="input" style="width:100%;" value="${form.storage_location || ""}" placeholder="مثال: رف A3 — مخزن 2"></div>
+      <div class="field">
+        <label>${t("itemImage")}</label>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="item-image-preview" style="width:52px; height:52px; border-radius:10px; background:var(--paper-deep); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+            ${form.image_base64 ? `<img src="${form.image_base64}" style="width:100%; height:100%; object-fit:cover;">` : icon("package", 22)}
+          </div>
+          <input type="file" id="f-image" accept="image/*">
+        </div>
+      </div>
+      <div style="display:flex; gap:10px;">
         <div class="field" style="flex:1;"><label>كود الصنف</label><input id="f-code" class="input mono" style="width:100%;" value="${form.code}"></div>
       </div>
       <div class="field">
@@ -1460,6 +1606,16 @@ function openItemModal(existing, prefillName, onDone) {
       <button class="btn-primary" id="f-save">${existing ? "حفظ التعديلات" : "إضافة الصنف"}</button>
     </div>`;
   document.body.appendChild(overlay);
+  let pendingImageData;
+  $("#f-image", overlay).onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImageData = reader.result;
+      $("#item-image-preview", overlay).innerHTML = `<img src="${reader.result}" style="width:100%; height:100%; object-fit:cover;">`;
+    };
+    reader.readAsDataURL(file);
+  };
   const drawBarcode = () => {
     const val = $("#f-barcode", overlay).value.trim();
     const prev = $("#barcode-preview", overlay);
@@ -1492,6 +1648,10 @@ function openItemModal(existing, prefillName, onDone) {
       max_qty: Number($("#f-max", overlay).value) || 0,
       code: $("#f-code", overlay).value.trim() || null,
       barcode: $("#f-barcode", overlay).value.trim() || null,
+      supplier_id: $("#f-supplier", overlay).value || null,
+      price: $("#f-price", overlay).value ? Number($("#f-price", overlay).value) : null,
+      storage_location: $("#f-storage", overlay).value.trim() || null,
+      image_base64: pendingImageData !== undefined ? pendingImageData : (form.image_base64 || null),
     };
     if (!payload.name) { toast("أدخل اسم الصنف", true); return; }
     if (!payload.max_qty || payload.max_qty <= 0) { toast("أدخل الحد الأقصى للمخزون", true); return; }
