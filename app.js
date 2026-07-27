@@ -686,6 +686,13 @@ function renderMoveBody(mode) {
     if (qty <= 0) { toast("أدخل كمية أكبر من صفر", true); return; }
     if (!isIn && qty > sel.qty) { toast("الكمية المطلوبة أكبر من المتوفر بالمخزن", true); return; }
     if (!isIn && !worker) { toast("يرجى إدخال اسم العامل الذي يسحب المادة", true); return; }
+    // تنبيه التكرار: هل تم بالفعل تنفيذ نفس نوع العملية (إدخال/سحب) على نفس الصنف اليوم؟
+    const todayStr = new Date().toDateString();
+    const dupToday = state.transactions.find(t => t.item_id === sel.id && t.type === mode && new Date(t.created_at).toDateString() === todayStr);
+    if (dupToday) {
+      const proceed = confirm(`⚠️ تم بالفعل تنفيذ عملية "${isIn ? "إدخال" : "سحب"}" على صنف "${sel.name}" اليوم الساعة ${new Date(dupToday.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} بكمية ${dupToday.qty} ${dupToday.unit}.\n\nهل ده تكرار بالغلط؟\n\nاضغط "موافق" للاستمرار وتنفيذ العملية دي كمان (لو فعلاً حصلت مرتين اليوم)، أو "إلغاء" لإلغاء هذه العملية المكررة.`);
+      if (!proceed) return;
+    }
     const newQty = isIn ? sel.qty + qty : Math.max(0, sel.qty - qty);
     const { error: e1 } = await sb.from("items").update({ qty: newQty }).eq("id", sel.id);
     if (e1) { toast("حدث خطأ أثناء الحفظ", true); return; }
