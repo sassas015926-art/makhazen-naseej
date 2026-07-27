@@ -503,7 +503,7 @@ function renderDashboard(main) {
     <div class="stats-grid">
       ${stats.map(s => `<div class="card"><div style="color:${s.color}">${icon(s.icon, 20)}</div><div class="stat-value" style="color:${s.color}">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}
     </div>
-    <div style="display:grid; grid-template-columns:1.3fr 1fr; gap:16px;">
+    <div class="dash-grid-main">
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div style="font-weight:800; font-size:15px;">${t("sectionUrgent")}</div>
@@ -537,7 +537,7 @@ function renderDashboard(main) {
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;">
+    <div class="dash-grid-charts">
       <div class="card">
         <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("chartMovement")}</div>
         <div id="movement-chart"></div>
@@ -1735,6 +1735,75 @@ function openItemModal(existing, prefillName, onDone) {
 }
 
 /* ---------------- تغيير كلمة المرور (ذاتيًا) ---------------- */
+/* ---------------- المساعدة ودليل الاستخدام ---------------- */
+function openHelpModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  const role = myRole();
+  const guides = [
+    { roles: ["admin", "factory_manager", "keeper", "production_manager", "quality", "viewer"], title: "لوحة التحكم", body: "نظرة سريعة على حالة المخزن: عدد الأصناف، الأصناف الحرجة، حركة آخر 7 أيام، وأكثر الأصناف استهلاكًا." },
+    { roles: ["admin", "keeper"], title: "إدخال مخزون / سحب من المخزن", body: "ابحث عن الصنف أو اخترته من قائمة الفئات، حدد الكمية بالأزرار +/-، واضغط تأكيد. لو الصنف مش موجود أصلاً، هيظهرلك زر لإضافته مباشرة." },
+    { roles: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"], title: "المخزون الحالي", body: "جدول بكل الأصناف مقسّم حسب الفئة، مع نسبة الامتلاء والحالة (جيد / منخفض / حرج). اضغط أيقونة الساعة بجانب أي صنف لعرض سجل حركته بالكامل." },
+    { roles: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"], title: "التقارير", body: "فلترة كاملة (تاريخ، نوع، صنف، عامل)، طباعة/PDF متعددة الصفحات، تصدير Excel، وطباعة إذن صرف/استلام لكل حركة على حدة." },
+    { roles: ["admin", "keeper"], title: "إدارة الأصناف", body: "إضافة/تعديل/حذف الأصناف والفئات، توليد كود وباركود تلقائي، واستيراد مئات الأصناف دفعة واحدة من ملف Excel." },
+    { roles: ["admin", "keeper"], title: "الموردون", body: "بيانات التواصل مع الموردين، وربطها بالأصناف من نموذج إضافة/تعديل الصنف." },
+    { roles: ["admin"], title: "إدارة المستخدمين", body: "إنشاء حسابات جديدة بأي دور من 7 أدوار، تحديد الصلاحيات، إيقاف أو حذف أي حساب نهائيًا." },
+    { roles: ["admin"], title: "الإعدادات", body: "اسم المصنع، الشعار، العنوان والهاتف، نسب التنبيه الحرج والمنخفض، والنسخ الاحتياطي (يدوي وتلقائي يوميًا)." },
+    { roles: ["admin", "factory_manager", "keeper", "production_manager", "quality", "viewer"], title: "الجرس 🔔", body: "يظهر عدد الأصناف اللي تحتاج شراء (منخفضة أو حرجة)، اضغط عليه لعرض القائمة كاملة." },
+    { roles: ["admin", "factory_manager", "keeper", "production_manager", "accountant", "quality", "viewer"], title: "تغيير كلمة المرور والخروج", body: "زر 🔑 بجانب زر الخروج في القائمة الجانبية لتغيير كلمة مرورك في أي وقت. النظام بيسجّل خروجك تلقائيًا بعد 20 دقيقة من عدم النشاط." },
+  ].filter(g => g.roles.includes(role));
+
+  overlay.innerHTML = `
+    <div class="modal-box" style="width:560px; max-width:92vw;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:17px;">دليل الاستخدام</div>
+        <button class="close-x" id="help-close">${icon("x", 15)}</button>
+      </div>
+      <div style="font-size:12px; color:var(--ink70); margin-bottom:14px;">الدليل ده مخصّص حسب صلاحياتك الحالية (${ROLE_LABELS[role]}).</div>
+      <div style="display:flex; flex-direction:column; gap:14px; max-height:60vh; overflow:auto;">
+        ${guides.map(g => `
+          <div>
+            <div style="font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:4px;">${g.title}</div>
+            <div style="font-size:12.5px; color:var(--ink70); line-height:1.8;">${g.body}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#help-close", overlay).onclick = () => overlay.remove();
+}
+
+/* ---------------- حول النظام ---------------- */
+function openAboutModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box" style="width:480px; max-width:92vw; text-align:center;">
+      <div style="display:flex; justify-content:flex-end;">
+        <button class="close-x" id="about-close">${icon("x", 15)}</button>
+      </div>
+      <div style="width:60px; height:60px; border-radius:16px; background:var(--mustard); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; overflow:hidden;">
+        ${state.settings.logo_base64 ? `<img src="${state.settings.logo_base64}" style="width:100%; height:100%; object-fit:cover;">` : icon("scissors", 28)}
+      </div>
+      <div style="font-weight:800; font-size:18px;">${state.settings.workshop_name || "مصنع نسيج"}</div>
+      <div style="font-size:12.5px; color:var(--ink70); margin-bottom:18px;">نظام إدارة المخازن</div>
+      <div style="text-align:right; background:var(--paper); border-radius:12px; padding:14px 16px; font-size:12.5px; color:var(--ink70); line-height:2;">
+        <div>✔ إدارة مستخدمين بـ 7 أدوار وصلاحيات مفصّلة</div>
+        <div>✔ إدخال وسحب مخزون بأكواد وباركود</div>
+        <div>✔ تقارير كاملة قابلة للطباعة والتصدير</div>
+        <div>✔ إذن صرف/استلام لكل حركة</div>
+        <div>✔ سجل عمليات كامل (Audit Log)</div>
+        <div>✔ نسخ احتياطي يدوي وتلقائي يومي</div>
+        <div>✔ استيراد أصناف بالجملة من Excel</div>
+        <div>✔ دعم لغتين: عربي وتركي</div>
+      </div>
+      <div style="margin-top:16px; font-size:11px; color:var(--ink50);">تم التطوير خصيصًا لـ ${state.settings.workshop_name || "المصنع"} — جميع البيانات مخزّنة بأمان على Supabase.</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#about-close", overlay).onclick = () => overlay.remove();
+}
+
 function openChangePasswordModal() {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -1825,5 +1894,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("#logout-btn").addEventListener("click", () => doLogout());
   $("#change-pass-btn").addEventListener("click", openChangePasswordModal);
+  $("#help-btn").addEventListener("click", openHelpModal);
+  $("#about-btn").addEventListener("click", openAboutModal);
   boot();
 });

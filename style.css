@@ -66,6 +66,8 @@ main{flex:1; padding:24px 28px; overflow:auto;}
 
 .card{background:var(--card); border-radius:16px; padding:18px; border:1px solid var(--ink12); box-shadow:0 1px 2px rgba(28,35,51,.04);}
 .stats-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;}
+.dash-grid-main{display:grid; grid-template-columns:1.3fr 1fr; gap:16px;}
+.dash-grid-charts{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;}
 .stat-value{font-size:28px; font-weight:800; margin-top:10px;}
 .stat-label{font-size:12.5px; color:var(--ink70); margin-top:4px;}
 
@@ -150,10 +152,39 @@ tbody tr:nth-child(odd){background:var(--card);}
 
 @media (max-width:860px){
   .layout{flex-direction:column;}
-  aside{width:100%; flex-direction:row; overflow-x:auto; align-items:center; padding:12px 14px;}
-  .brand{border:none; margin:0; padding:0 10px 0 0;}
+  aside{width:100%; flex-direction:row; overflow-x:auto; align-items:center; padding:10px 12px; gap:10px;}
+  #nav-list{display:flex; flex-direction:row; gap:4px; overflow-x:auto; flex-shrink:0;}
+  .brand{border:none; margin:0; padding:0; flex-shrink:0;}
+  .brand-sub{display:none;}
   .nav-footer, .who{display:none;}
-  .nav-btn{flex-direction:column; gap:4px; font-size:11px; padding:8px 10px; white-space:nowrap;}
+  .nav-btn{flex-direction:column; gap:3px; font-size:10.5px; padding:7px 9px; white-space:nowrap; flex-shrink:0;}
+  .nav-btn span{display:block;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
-  main{padding:16px;}
+  .dash-grid-main, .dash-grid-charts{grid-template-columns:1fr;}
+  main{padding:12px;}
+  .topbar{padding:8px 12px 0;}
+
+  /* الجداول: سكرول أفقي بدل ما تتكسر أو تضغط الأعمدة على بعضها */
+  .card{padding:14px;}
+  .card[style*="padding:0"]{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table{min-width:560px;}
+
+  /* لمسات أسهل على الشاشة الصغيرة */
+  .btn-dark, .btn-primary, .step-btn, .icon-btn{min-height:38px;}
+  .section-header{flex-direction:column; align-items:stretch; gap:10px;}
+  .section-header > div:last-child{width:100%;}
+  .section-header .btn-dark{width:100%; justify-content:center;}
+
+  /* صفوف الفلاتر في التقارير: عمود واحد بدل صف مزدحم */
+  #report-print-area ~ .card [style*="flex-wrap:wrap"] > div,
+  .card > div[style*="display:flex; flex-wrap:wrap; gap:8px; align-items:end;"] > div{width:100%;}
+
+  .modal-box{padding:16px; max-height:82vh;}
+  .bell-dropdown{width:min(280px, calc(100vw - 32px)); left:auto; right:0;}
+  .tile-grid{grid-template-columns:repeat(auto-fill, minmax(150px,1fr));}
+}
+
+@media (max-width:480px){
+  .stats-grid{grid-template-columns:1fr;}
+  .login-card{padding:24px 18px;}
 }
