@@ -1252,6 +1252,33 @@ function renderItemsAdmin(main) {
 
       if (!validRows.length) { statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">لا توجد صفوف صالحة للاستيراد (تأكد من عمودي "اسم الصنف" و"الحد الأقصى").</span>`; e.target.value = ""; return; }
 
+      // كشف التكرار: أصناف بنفس الاسم موجودة بالفعل في النظام، أو مكررة داخل الملف نفسه
+      const existingNames = new Set(state.items.map(i => i.name.trim().toLowerCase()));
+      const seenInFile = new Set();
+      const dupNames = new Set();
+      validRows.forEach(r => {
+        const key = r.name.trim().toLowerCase();
+        if (existingNames.has(key) || seenInFile.has(key)) dupNames.add(r.name);
+        seenInFile.add(key);
+      });
+
+      let finalRows = validRows;
+      if (dupNames.size) {
+        const list = [...dupNames].slice(0, 10).join("، ") + (dupNames.size > 10 ? " ..." : "");
+        const proceed = confirm(`⚠️ لوحظ ${dupNames.size} صنف مكرر (موجود بالفعل أو مكرر داخل الملف نفسه):\n${list}\n\nاضغط "موافق" لاستيراد الكل بما فيهم المكررات كأصناف منفصلة، أو "إلغاء" لاستبعاد المكررات والاستيراد بالباقي فقط.`);
+        if (!proceed) {
+          const seen2 = new Set();
+          finalRows = validRows.filter(r => {
+            const key = r.name.trim().toLowerCase();
+            if (existingNames.has(key) || seen2.has(key)) return false;
+            seen2.add(key);
+            return true;
+          });
+          if (!finalRows.length) { statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">كل الصفوف كانت مكررة — لم يتم استيراد أي صنف جديد.</span>`; e.target.value = ""; return; }
+        }
+      }
+      validRows.length = 0; validRows.push(...finalRows);
+
       statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ استيراد ${validRows.length} صنف</span>`;
 
       // إضافة أي فئات جديدة واردة في الملف قبل استيراد الأصناف
@@ -1663,6 +1690,14 @@ function openItemModal(existing, prefillName, onDone) {
     };
     if (!payload.name) { toast("أدخل اسم الصنف", true); return; }
     if (!payload.max_qty || payload.max_qty <= 0) { toast("أدخل الحد الأقصى للمخزون", true); return; }
+    // تنبيه التكرار: لو ده صنف جديد (مش تعديل) واسمه مطابق لصنف موجود بالفعل
+    if (!existing) {
+      const dup = state.items.find(i => i.name.trim().toLowerCase() === payload.name.trim().toLowerCase());
+      if (dup) {
+        const proceed = confirm(`⚠️ يوجد صنف بنفس الاسم "${dup.name}" بالفعل (الفئة: ${dup.category || "—"}، الكمية الحالية: ${dup.qty} ${dup.unit}).\n\nاضغط "موافق" لإضافته كصنف منفصل على أي حال، أو "إلغاء" للتراجع (يمكنك بدلًا من ذلك تعديل الصنف الموجود أو عمل "إدخال مخزون" عليه بدل إنشاء نسخة جديدة).`);
+        if (!proceed) return;
+      }
+    }
     let error, newItemId = existing?.id;
     if (existing) {
       ({ error } = await sb.from("items").update(payload).eq("id", existing.id));
