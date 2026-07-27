@@ -1016,7 +1016,7 @@ function renderSettings(main) {
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
-    if (error) { toast("تعذر حفظ الإعدادات", true); return; }
+    if (error) { toast("تعذر حفظ الإعدادات — " + (error.message || ""), true); return; }
     await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
   };
 }
@@ -1226,7 +1226,9 @@ function renderItemsAdmin(main) {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
+      // نقرأ شيت "أصناف" بالاسم لو موجود (ملف القالب فيه شيت تعليمات كمان)، وإلا أول شيت في الملف للتوافق مع ملفات قديمة
+      const sheetName = wb.SheetNames.includes("أصناف") ? "أصناف" : wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
       const colVal = (row, ...keys) => { for (const k of keys) if (row[k] !== undefined && row[k] !== "") return row[k]; return ""; };
@@ -1267,10 +1269,16 @@ function renderItemsAdmin(main) {
         r.code = `${prefix}-${String(localCounters[prefix]).padStart(4, "0")}`;
       });
 
-      const { error } = await sb.from("items").insert(validRows);
+      const { data: insertedItems, error } = await sb.from("items").insert(validRows).select();
       if (error) {
         statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">تعذر الاستيراد: ${error.message}</span>`;
       } else {
+        // تسجيل رصيد افتتاحي كحركة "إدخال" لكل صنف اتضاف بكمية أكبر من صفر
+        const openingTx = (insertedItems || []).filter(it => it.qty > 0).map(it => ({
+          item_id: it.id, item_name: it.name, unit: it.unit, type: "in", qty: it.qty,
+          worker: state.profile?.full_name || "", note: "رصيد افتتاحي — استيراد Excel",
+        }));
+        if (openingTx.length) { await sb.from("transactions").insert(openingTx); await loadTransactions(); }
         logAudit({ action: "استيراد أصناف من Excel", entity: "item", details: `تم استيراد ${validRows.length} صنف` });
         statusEl.innerHTML = `<span style="color:var(--green); font-weight:700;">✔ تم استيراد ${validRows.length} صنف بنجاح${skipped.length ? ` — تم تجاهل ${skipped.length} صف ناقص البيانات (السطور: ${skipped.slice(0, 10).join("، ")}${skipped.length > 10 ? "..." : ""})` : ""}</span>`;
         await loadItems();
@@ -1392,7 +1400,7 @@ function openSupplierModal(existing, main) {
     let error;
     if (existing) ({ error } = await sb.from("suppliers").update(payload).eq("id", existing.id));
     else ({ error } = await sb.from("suppliers").insert(payload));
-    if (error) { toast("تعذر حفظ بيانات المورد", true); return; }
+    if (error) { toast("تعذر حفظ بيانات المورد — " + (error.message || "خطأ غير معروف"), true); return; }
     logAudit({ action: existing ? "تعديل مورد" : "إضافة مورد", entity: "supplier", entityName: payload.name });
     overlay.remove();
     await loadSuppliers();
@@ -1431,7 +1439,7 @@ function renderUsers(main) {
     </tr>`).join("");
   $$("[data-role]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("profiles").update({ role: sel.value }).eq("id", sel.dataset.role);
-    if (error) { toast("تعذر تحديث الدور — تأكد إنك مسجل بحساب مدير", true); return; }
+    if (error) { toast("تعذر تحديث الدور — " + (error.message || "تأكد إنك مسجل بحساب مدير"), true); return; }
     const p = state.profiles.find(x => x.id === sel.dataset.role);
     logAudit({ action: "تغيير دور مستخدم", entity: "user", entityName: p?.full_name, details: `الدور الجديد: ${roleLabels[sel.value]}` });
     await loadProfiles(); renderUsers(main); toast("تم تحديث الدور");
@@ -1449,7 +1457,7 @@ function renderUsers(main) {
     const p = state.profiles.find(x => x.id === btn.dataset.toggle);
     const newVal = !(p.is_active !== false);
     const { error } = await sb.from("profiles").update({ is_active: newVal }).eq("id", p.id);
-    if (error) { toast("تعذر تحديث الحالة", true); return; }
+    if (error) { toast("تعذر تحديث الحالة — " + (error.message || ""), true); return; }
     logAudit({ action: newVal ? "تفعيل حساب" : "إيقاف حساب", entity: "user", entityName: p.full_name });
     await loadProfiles(); renderUsers(main); toast(newVal ? "تم تفعيل الحساب" : "تم إيقاف الحساب");
   });
@@ -1655,14 +1663,28 @@ function openItemModal(existing, prefillName, onDone) {
     };
     if (!payload.name) { toast("أدخل اسم الصنف", true); return; }
     if (!payload.max_qty || payload.max_qty <= 0) { toast("أدخل الحد الأقصى للمخزون", true); return; }
-    let error;
-    if (existing) ({ error } = await sb.from("items").update(payload).eq("id", existing.id));
-    else ({ error } = await sb.from("items").insert(payload));
-    if (error) { toast(error.message.includes("duplicate") ? "هذا الكود مستخدم بالفعل لصنف آخر" : "تعذر حفظ الصنف", true); return; }
+    let error, newItemId = existing?.id;
+    if (existing) {
+      ({ error } = await sb.from("items").update(payload).eq("id", existing.id));
+    } else {
+      const { data: inserted, error: insErr } = await sb.from("items").insert(payload).select().single();
+      error = insErr;
+      if (inserted) newItemId = inserted.id;
+    }
+    if (error) { toast(error.message.includes("duplicate") ? "هذا الكود مستخدم بالفعل لصنف آخر" : "تعذر حفظ الصنف — " + error.message, true); return; }
     logAudit({
       action: existing ? "تعديل صنف" : "إضافة صنف", entity: "item", entityName: payload.name,
       qtyBefore: existing ? existing.qty : null, qtyAfter: payload.qty,
     });
+    // لو صنف جديد وبكمية ابتدائية أكبر من صفر، نسجّلها كحركة "إدخال" (رصيد افتتاحي)
+    // عشان تظهر في لوحة التحكم والتقارير وسجل الحركات زي أي عملية إدخال عادية
+    if (!existing && payload.qty > 0 && newItemId) {
+      await sb.from("transactions").insert({
+        item_id: newItemId, item_name: payload.name, unit: payload.unit, type: "in", qty: payload.qty,
+        worker: state.profile?.full_name || "", note: "رصيد افتتاحي عند إضافة الصنف",
+      });
+      await loadTransactions();
+    }
     overlay.remove();
     await loadItems();
     if (typeof onDone === "function") onDone(); else render();
@@ -1692,7 +1714,7 @@ function openChangePasswordModal() {
     if (p1.length < 6) { toast("كلمة المرور لازم تكون 6 أحرف على الأقل", true); return; }
     if (p1 !== p2) { toast("كلمتا المرور غير متطابقتين", true); return; }
     const { error } = await sb.auth.updateUser({ password: p1 });
-    if (error) { toast("تعذر تغيير كلمة المرور", true); return; }
+    if (error) { toast("تعذر تغيير كلمة المرور — " + (error.message || ""), true); return; }
     logAudit({ action: "تغيير كلمة المرور", entity: "user", entityName: state.profile?.full_name });
     overlay.remove();
     toast("تم تغيير كلمة المرور بنجاح");
