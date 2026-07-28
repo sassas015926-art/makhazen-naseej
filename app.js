@@ -996,6 +996,18 @@ function renderSettings(main) {
       <button class="btn-primary" id="ws-save">${t("saveFactoryInfo")}</button>
     </div>
 
+    <div class="card" style="margin-bottom:18px; max-width:560px;">
+      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">إشعارات المخزون المنخفض (إيميل وتليجرام)</div>
+      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">لما أي صنف يوصل لمستوى منخفض أو حرج، النظام يبعت إشعار تلقائي فورًا. الخطوات الكاملة لإنشاء المفاتيح موجودة في ملف <code>migration_notifications.sql</code>.</div>
+      <div class="field"><label>إيميلات الإشعارات (مفصولة بفاصلة)</label><input id="ws-emails" class="input" style="width:100%;" value="${state.settings.notify_emails || ""}" placeholder="admin@example.com, manager@example.com"></div>
+      <div class="field"><label>مفتاح Resend (لإرسال الإيميلات)</label><input id="ws-resend" class="input" style="width:100%;" value="${state.settings.resend_api_key || ""}" placeholder="re_xxxxxxxx"></div>
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;"><label>توكن بوت تليجرام</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
+        <div class="field" style="flex:1;"><label>Chat ID تليجرام</label><input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789"></div>
+      </div>
+      <button class="btn-primary" id="ws-save-notify">حفظ إعدادات الإشعارات</button>
+    </div>
+
     ${isAdmin() ? `
     <div class="card" style="margin-bottom:18px; max-width:560px;">
       <div style="font-weight:800; font-size:15px; margin-bottom:6px;">النسخ الاحتياطي</div>
@@ -1025,6 +1037,21 @@ function renderSettings(main) {
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
     if (error) { toast("تعذر حفظ الإعدادات — " + (error.message || ""), true); return; }
     await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
+  };
+
+  $("#ws-save-notify").onclick = async () => {
+    const payload = {
+      notify_emails: $("#ws-emails").value.trim(),
+      resend_api_key: $("#ws-resend").value.trim(),
+      telegram_bot_token: $("#ws-tg-token").value.trim(),
+      telegram_chat_id: $("#ws-tg-chat").value.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await sb.from("settings").update(payload).eq("id", 1);
+    if (error) { toast("تعذر حفظ إعدادات الإشعارات — " + (error.message || ""), true); return; }
+    await loadSettings();
+    logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
+    toast("تم حفظ إعدادات الإشعارات");
   };
 }
 
@@ -1199,6 +1226,10 @@ function renderItemsAdmin(main) {
 
     <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
+    <div style="position:relative; margin-bottom:12px; max-width:320px;">
+      <span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
+      <input id="items-search" class="input" style="width:100%; padding-right:34px;" placeholder="${t("searchByNameCode")}">
+    </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th>${t("itemSupplier")}</th><th>${t("itemStorage")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
@@ -1282,9 +1313,9 @@ function renderItemsAdmin(main) {
             return true;
           });
           if (!finalRows.length) { statusEl.innerHTML = `<span style="color:var(--red); font-weight:700;">كل الصفوف كانت مكررة — لم يتم استيراد أي صنف جديد.</span>`; e.target.value = ""; return; }
+          validRows.length = 0; validRows.push(...finalRows);
         }
       }
-      validRows.length = 0; validRows.push(...finalRows);
 
       statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ استيراد ${validRows.length} صنف</span>`;
 
@@ -1345,16 +1376,23 @@ function renderItemsAdmin(main) {
   };
 
   const drawItems = () => {
-    $("#items-body").innerHTML = state.items.map(it => `
-      <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td><td style="font-weight:700;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
+    const q = ($("#items-search").value || "").toLowerCase().trim();
+    const filtered = q ? state.items.filter(it => it.name.toLowerCase().includes(q) || (it.code || "").toLowerCase().includes(q)) : state.items;
+    const isNew = (it) => it.created_at && (Date.now() - new Date(it.created_at).getTime()) < 48 * 3600 * 1000; // آخر 48 ساعة
+    $("#items-body").innerHTML = filtered.length ? filtered.map(it => `
+      <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td>
+      <td style="font-weight:700;">${it.name} ${isNew(it) ? `<span class="pill pill-ok" style="margin-right:6px;">جديد</span>` : ""}</td>
+      <td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
       <td class="mono">${it.qty}</td><td class="mono">${it.max_qty}</td>
       <td style="color:var(--ink70); font-size:12.5px;">${(state.suppliers.find(s => s.id === it.supplier_id) || {}).name || "—"}</td>
       <td style="color:var(--ink70); font-size:12.5px;">${it.storage_location || "—"}</td>
-      <td><div style="display:flex; gap:8px; justify-content:flex-end;">
+      <td><div style="display:flex; gap:6px; justify-content:flex-end;">
+        <button class="icon-btn" style="color:var(--green);" data-quick-add="${it.id}" title="إضافة كمية سريعًا">${icon("plus", 14)}</button>
         <button class="icon-btn" data-edit="${it.id}">${icon("pencil", 14)}</button>
         <button class="icon-btn" style="color:var(--red);" data-del="${it.id}">${icon("trash", 14)}</button>
-      </div></td></tr>`).join("");
+      </div></td></tr>`).join("") : `<tr><td colspan="9"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`;
     $$("[data-edit]").forEach(b => b.onclick = () => openItemModal(state.items.find(i => i.id === b.dataset.edit)));
+    $$("[data-quick-add]").forEach(b => b.onclick = () => openQuickAddQtyModal(state.items.find(i => i.id === b.dataset.quickAdd), main));
     $$("[data-del]").forEach(b => b.onclick = async () => {
       const it = state.items.find(i => i.id === b.dataset.del);
       if (!confirm(`حذف "${it.name}" نهائيًا؟`)) return;
@@ -1364,7 +1402,54 @@ function renderItemsAdmin(main) {
     });
   };
   drawItems();
+  $("#items-search").oninput = drawItems;
   $("#new-item-btn").onclick = () => openItemModal(null);
+}
+
+/* ---------------- إضافة كمية سريعة لصنف موجود بالفعل ---------------- */
+function openQuickAddQtyModal(item, main) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:360px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div style="font-weight:800; font-size:16px;">إضافة كمية سريعة</div>
+        <button class="close-x" id="qa-close">${icon("x", 15)}</button>
+      </div>
+      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">${item.name}</div>
+      <div style="font-size:12px; color:var(--ink70); margin-bottom:14px;">المتوفر حاليًا: ${item.qty} ${item.unit}</div>
+      <div class="field">
+        <label>الكمية المضافة</label>
+        <div class="step-row">
+          <button class="step-btn" id="qa-minus">${icon("minus", 16)}</button>
+          <input id="qa-qty" type="number" min="1" value="1" class="input mono" style="width:90px; text-align:center;">
+          <button class="step-btn" id="qa-plus">${icon("plus", 16)}</button>
+          <span style="color:var(--ink70); font-size:13px;">${item.unit}</span>
+        </div>
+      </div>
+      <button class="btn-primary" id="qa-save" style="background:var(--green);">${icon("in", 16)} تأكيد الإضافة</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#qa-close", overlay).onclick = () => overlay.remove();
+  $("#qa-minus", overlay).onclick = () => { const inp = $("#qa-qty", overlay); inp.value = Math.max(1, Number(inp.value) - 1); };
+  $("#qa-plus", overlay).onclick = () => { const inp = $("#qa-qty", overlay); inp.value = Number(inp.value) + 1; };
+  $("#qa-save", overlay).onclick = async () => {
+    const qty = Number($("#qa-qty", overlay).value) || 0;
+    if (qty <= 0) { toast("أدخل كمية أكبر من صفر", true); return; }
+    const newQty = item.qty + qty;
+    const { error } = await sb.from("items").update({ qty: newQty }).eq("id", item.id);
+    if (error) { toast("تعذر تحديث الكمية", true); return; }
+    await sb.from("transactions").insert({
+      item_id: item.id, item_name: item.name, unit: item.unit, type: "in", qty,
+      worker: state.profile?.full_name || "", note: "إضافة سريعة",
+    });
+    logAudit({ action: "إدخال", entity: "item", entityName: item.name, qtyBefore: item.qty, qtyAfter: newQty, details: "إضافة سريعة" });
+    overlay.remove();
+    await Promise.all([loadItems(), loadTransactions()]);
+    renderItemsAdmin(main);
+    toast(`تم إضافة ${qty} ${item.unit} إلى "${item.name}"`);
+  };
 }
 
 /* ---------------- الموردون (المدير وأمين المخزن) ---------------- */
