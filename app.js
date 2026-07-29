@@ -33,7 +33,7 @@ const state = {
   user: null, profile: null,
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
   categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [], suppliers: [],
-  tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), pendingItemFilter: null,
+  tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), reportItemFocus: null,
 };
 
 const I18N = {
@@ -417,6 +417,8 @@ function renderNav() {
     if (state.tab === "audit") await loadAuditLog();
     if (state.tab === "users") await loadProfiles();
     if (state.tab === "suppliers") await loadSuppliers();
+    $("#nav-list").classList.remove("mobile-open");
+    $("#mobile-extra-controls").classList.remove("mobile-open");
     render();
   });
   const roleTag = $("#who-role"); if (roleTag) roleTag.textContent = ROLE_LABELS[myRole()] || "";
@@ -1981,5 +1983,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#change-pass-btn").addEventListener("click", openChangePasswordModal);
   $("#help-btn").addEventListener("click", openHelpModal);
   $("#about-btn").addEventListener("click", openAboutModal);
+  $("#mobile-menu-btn").addEventListener("click", () => {
+    $("#nav-list").classList.toggle("mobile-open");
+    $("#mobile-extra-controls").classList.toggle("mobile-open");
+  });
   boot();
 });
