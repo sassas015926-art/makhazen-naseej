@@ -717,7 +717,7 @@ function renderMoveBody(mode) {
 function renderStock(main) {
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${t("stockTitle")}</div><div class="section-sub">${state.items.length} ${t("itemsRegistered")}</div></div></div>
-    <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+    <div class="toolbar">
       <div style="position:relative;"><span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
         <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="${t("searchByNameCode")}"></div>
       <select id="stock-cat" class="input"><option value="__all__">${t("all")}</option>${state.categories.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
@@ -800,12 +800,12 @@ function renderReports(main) {
       </div>
 
       <div class="card" id="section-consumption" style="margin-bottom:18px;">
-        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("consumptionSection")}</div>
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px; display:flex; align-items:center; gap:7px;">${icon("chart", 16)} ${t("consumptionSection")}</div>
         <div id="consumption-list"></div>
       </div>
 
       <div class="card" id="section-daily" style="margin-bottom:18px;">
-        <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("dailySection")}</div>
+        <div style="font-weight:800; font-size:15px; margin-bottom:14px; display:flex; align-items:center; gap:7px;">${icon("grid", 16)} ${t("dailySection")}</div>
         <div style="overflow:auto;"><table><thead><tr><th>اليوم</th><th>عدد عمليات الإدخال</th><th>إجمالي الكمية المُدخلة</th><th>عدد عمليات السحب</th><th>إجمالي الكمية المسحوبة</th></tr></thead><tbody id="daily-body"></tbody></table></div>
       </div>
 
@@ -976,7 +976,7 @@ function renderSettings(main) {
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${t("settingsTitle")}</div><div class="section-sub">${t("settingsSub")}</div></div></div>
     <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("factoryInfo")}</div>
+      <div class="card-title">${icon("gear", 17)} ${t("factoryInfo")}</div>
       <div class="field"><label>${t("factoryName")}</label><input id="ws-name" class="input" style="width:100%;" value="${state.settings.workshop_name || ""}"></div>
       <div class="field">
         <label>${t("factoryLogo")}</label>
@@ -999,7 +999,7 @@ function renderSettings(main) {
     </div>
 
     <div class="card" style="margin-bottom:18px; max-width:560px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">إشعارات المخزون المنخفض (إيميل وتليجرام)</div>
+      <div class="card-title" style="margin-bottom:6px;">${icon("alert", 17)} إشعارات المخزون المنخفض (إيميل وتليجرام)</div>
       <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">لما أي صنف يوصل لمستوى منخفض أو حرج، النظام يبعت إشعار تلقائي فورًا. الخطوات الكاملة لإنشاء المفاتيح موجودة في ملف <code>migration_notifications.sql</code>.</div>
       <div class="field"><label>إيميلات الإشعارات (مفصولة بفاصلة)</label><input id="ws-emails" class="input" style="width:100%;" value="${state.settings.notify_emails || ""}" placeholder="admin@example.com, manager@example.com"></div>
       <div class="field"><label>مفتاح Resend (لإرسال الإيميلات)</label><input id="ws-resend" class="input" style="width:100%;" value="${state.settings.resend_api_key || ""}" placeholder="re_xxxxxxxx"></div>
@@ -1012,7 +1012,7 @@ function renderSettings(main) {
 
     ${isAdmin() ? `
     <div class="card" style="margin-bottom:18px; max-width:560px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:6px;">النسخ الاحتياطي</div>
+      <div class="card-title" style="margin-bottom:6px;">${icon("history", 17)} النسخ الاحتياطي</div>
       <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">نسخة تلقائية كل يوم + إمكانية إنشاء نسخة يدوية أو استعادة نسخة سابقة. الاستعادة ترجّع الأصناف والفئات وبيانات المصنع فقط، وسجل الحركات لا يتأثر أبدًا.</div>
       <button class="btn-dark" id="backup-now" style="margin-bottom:16px;">${icon("download", 14)} إنشاء نسخة احتياطية الآن</button>
       <div id="backups-list"></div>
@@ -1189,7 +1189,7 @@ function renderItemsAdmin(main) {
     <div class="section-header"><div><div class="section-title">${t("itemsAdminTitle")}</div><div class="section-sub">${t("itemsAdminSub")}</div></div></div>
 
     <div class="card" style="margin-bottom:18px; max-width:480px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:14px;">${t("categoriesTitle")}</div>
+      <div class="card-title">${icon("grid", 17)} ${t("categoriesTitle")}</div>
       <div id="cat-chips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
       <div style="display:flex; gap:8px;">
         <input id="new-cat" class="input" style="flex:1;" placeholder="${t("newCategoryPlaceholder")}">
@@ -1198,7 +1198,7 @@ function renderItemsAdmin(main) {
     </div>
 
     <div class="card" style="margin-bottom:18px; max-width:620px;">
-      <div style="font-weight:800; font-size:15px; margin-bottom:10px;">استيراد أصناف من Excel</div>
+      <div class="card-title" style="margin-bottom:10px;">${icon("download", 17)} استيراد أصناف من Excel</div>
       <div style="font-size:12.5px; color:var(--ink70); margin-bottom:10px;">بيضيف مئات الأصناف دفعة واحدة من ملف Excel. اتبع الخطوات بالترتيب:</div>
       <ol style="font-size:12.5px; color:var(--ink70); margin:0 0 14px; padding-right:20px; line-height:2;">
         <li>اضغط <b>"تنزيل قالب Excel"</b> تحت — هيوصلك ملف فيه صف مثال (اسمه واضح "مثال — احذفه") + شيت تعليمات.</li>
@@ -1228,9 +1228,11 @@ function renderItemsAdmin(main) {
 
     <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
-    <div style="position:relative; margin-bottom:12px; max-width:320px;">
-      <span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
-      <input id="items-search" class="input" style="width:100%; padding-right:34px;" placeholder="${t("searchByNameCode")}">
+    <div class="toolbar">
+      <div style="position:relative; max-width:320px; flex:1;">
+        <span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
+        <input id="items-search" class="input" style="width:100%; padding-right:34px;" placeholder="${t("searchByNameCode")}">
+      </div>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th>${t("itemSupplier")}</th><th>${t("itemStorage")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
