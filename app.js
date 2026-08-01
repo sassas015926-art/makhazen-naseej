@@ -22,6 +22,7 @@ const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
 };
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -34,6 +35,7 @@ const state = {
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
   categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [], suppliers: [],
   tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), reportItemFocus: null,
+  _alertOpen: false,
 };
 
 const I18N = {
@@ -432,7 +434,19 @@ function render() {
   const banner = $("#alert-banner");
   if (critItems.length) {
     banner.classList.remove("hidden");
-    banner.innerHTML = `${icon("alert", 17)} تنبيه: ${critItems.length} صنف وصل إلى أقل من ${state.settings.alert_threshold_percent || 15}% من الحد الأقصى للمخزون — ${critItems.slice(0, 4).map(i => i.name).join("، ")}${critItems.length > 4 ? " ..." : ""}`;
+    const isOpen = state._alertOpen;
+    banner.innerHTML = `
+      <div class="alert-banner-row">
+        ${icon("alert", 16)}
+        <span class="alert-msg">تنبيه: ${critItems.length} صنف وصل إلى أقل من ${state.settings.alert_threshold_percent || 15}% من الحد الأقصى للمخزون</span>
+        <button id="alert-toggle-btn" class="alert-toggle-btn ${isOpen ? "open" : ""}">${isOpen ? "إخفاء" : "عرض التفاصيل"} ${icon("chevronDown", 13)}</button>
+      </div>
+      <div class="alert-details ${isOpen ? "open" : ""}"><div class="alert-details-inner">
+        ${critItems.map(i => `<span class="alert-chip" data-alert-item="${i.name}">${icon("alert", 12)} ${i.name} — ${Math.round(pctOf(i))}%</span>`).join("")}
+      </div></div>`;
+    const toggleBtn = $("#alert-toggle-btn");
+    if (toggleBtn) toggleBtn.onclick = () => { state._alertOpen = !state._alertOpen; render(); };
+    $$("[data-alert-item]").forEach(chip => chip.onclick = () => { state.tab = "stock"; render(); });
   } else banner.classList.add("hidden");
 
   const main = $("#main");
@@ -715,12 +729,14 @@ function renderMoveBody(mode) {
 
 /* ---------------- stock table ---------------- */
 function renderStock(main) {
+  const collapsedCats = new Set();
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${t("stockTitle")}</div><div class="section-sub">${state.items.length} ${t("itemsRegistered")}</div></div></div>
     <div class="toolbar">
       <div style="position:relative;"><span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
         <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="${t("searchByNameCode")}"></div>
       <select id="stock-cat" class="input"><option value="__all__">${t("all")}</option>${state.categories.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
+      <button class="icon-btn" id="stock-toggle-all" style="width:auto; padding:0 12px; gap:6px; display:inline-flex; align-items:center; font-size:12.5px; font-weight:700;" title="طي/فرد كل الفئات">${icon("grid", 14)} طي الكل</button>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("quantity")}</th><th>%</th><th>${t("status")}</th><th></th></tr></thead><tbody id="stock-body"></tbody></table>
@@ -732,16 +748,32 @@ function renderStock(main) {
     if (!filtered.length) { $("#stock-body").innerHTML = `<tr><td colspan="7"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
     const groups = {};
     filtered.forEach(it => { const c = it.category || "بدون فئة"; (groups[c] = groups[c] || []).push(it); });
-    $("#stock-body").innerHTML = Object.entries(groups).map(([catName, catItems]) => `
-      <tr><td colspan="7" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);">${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
+    $("#stock-body").innerHTML = Object.entries(groups).map(([catName, catItems]) => {
+      const isCollapsed = collapsedCats.has(catName);
+      return `
+      <tr class="cat-row ${isCollapsed ? "is-collapsed" : ""}" data-cat-toggle="${catName}"><td colspan="7" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);"><span class="cat-chevron">${icon("chevronDown", 13)}</span>${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
       ${catItems.map(it => `
-        <tr><td class="mono" style="color:var(--mustard); font-weight:700;">${it.code || "—"}</td><td style="font-weight:700; padding-right:26px;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td>
+        <tr data-cat-row="${catName}" style="${isCollapsed ? "display:none;" : ""}"><td class="mono" style="color:var(--mustard); font-weight:700;">${it.code || "—"}</td><td style="font-weight:700; padding-right:26px;">${it.name}</td><td style="color:var(--ink70);">${it.category || "—"}</td>
         <td class="mono">${it.qty} / ${it.max_qty} ${it.unit}</td><td style="width:200px;">${tape(it, true)}</td><td>${pill(statusOf(it))}</td>
         <td><button class="icon-btn" data-movement="${it.name}" title="عرض حركة هذا الصنف">${icon("history", 13)}</button></td></tr>`).join("")}
-    `).join("");
+    `}).join("");
     $$("[data-movement]").forEach(b => b.onclick = () => { state.pendingItemFilter = b.dataset.movement; state.tab = "reports"; render(); });
+    $$("[data-cat-toggle]").forEach(row => row.onclick = () => {
+      const cat = row.dataset.catToggle;
+      if (collapsedCats.has(cat)) collapsedCats.delete(cat); else collapsedCats.add(cat);
+      row.classList.toggle("is-collapsed");
+      $$(`[data-cat-row="${cat}"]`).forEach(r => r.style.display = collapsedCats.has(cat) ? "none" : "");
+    });
   };
-  $("#stock-search").oninput = draw; $("#stock-cat").onchange = draw; draw();
+  $("#stock-search").oninput = draw; $("#stock-cat").onchange = draw;
+  $("#stock-toggle-all").onclick = () => {
+    const allCats = state.categories.length ? state.categories : [...new Set(state.items.map(i => i.category || "بدون فئة"))];
+    const collapsingAll = collapsedCats.size < allCats.length;
+    collapsedCats.clear();
+    if (collapsingAll) allCats.forEach(c => collapsedCats.add(c));
+    draw();
+  };
+  draw();
 }
 
 /* ---------------- reports ---------------- */
@@ -757,12 +789,19 @@ function renderReports(main) {
     </div>
 
     <div class="card no-print" style="margin-bottom:18px;">
-      <div style="font-weight:800; font-size:14px; margin-bottom:12px;">${t("printSectionsTitle")}</div>
+      <div style="font-weight:800; font-size:14px; margin-bottom:12px; display:flex; align-items:center; gap:7px;">${icon("check", 15)} ${t("printSectionsTitle")}</div>
       <div style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px;">
         <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-lowstock" checked> ${t("lowStockSection")}</label>
         <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-consumption" checked> ${t("consumptionSection")}</label>
         <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-daily" checked> ${t("dailySection")}</label>
         <label style="display:flex; align-items:center; gap:6px; font-size:13px;"><input type="checkbox" id="inc-txlog" checked> ${t("txLogSection")}</label>
+      </div>
+      <div style="border-top:1px solid var(--line); padding-top:14px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12.5px; font-weight:800; color:var(--ink70);">${icon("grid", 14)} طباعة فئات معيّنة فقط <span style="font-weight:600; color:var(--ink50);">(اختَر الفئات اللي عايز تطبعها بس)</span></div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <label class="chip" style="cursor:pointer; background:var(--mustard-soft); color:var(--mustard);"><input type="checkbox" id="cat-filter-all" checked style="accent-color:var(--mustard);"> الكل</label>
+          ${state.categories.map(c => `<label class="chip" style="cursor:pointer;"><input type="checkbox" class="cat-filter-item" value="${c}" checked style="accent-color:var(--mustard);"> ${c}</label>`).join("")}
+        </div>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:end;">
         <div><label style="display:block; font-size:11.5px; color:var(--ink70); margin-bottom:4px;">${t("quickRange")}</label>
@@ -819,46 +858,67 @@ function renderReports(main) {
       </div>
     </div>`;
 
-  // الملخص اليومي: تجميع الحركات حسب اليوم (الوقت الدقيق لكل حركة يظهر بسجل الحركات بالأسفل)
-  const dailyMap = {};
-  state.transactions.forEach(t => {
-    const day = new Date(t.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" });
-    if (!dailyMap[day]) dailyMap[day] = { inCount: 0, inQty: 0, outCount: 0, outQty: 0 };
-    if (t.type === "in") { dailyMap[day].inCount++; dailyMap[day].inQty += Number(t.qty); }
-    else { dailyMap[day].outCount++; dailyMap[day].outQty += Number(t.qty); }
-  });
-  const dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
-  $("#daily-body").innerHTML = dailyRows.length ? dailyRows.map(([day, d]) => `
-    <tr><td style="font-weight:700;" class="mono">${day}</td><td class="mono">${d.inCount}</td><td class="mono" style="color:var(--green);">+${d.inQty}</td>
-    <td class="mono">${d.outCount}</td><td class="mono" style="color:var(--red);">-${d.outQty}</td></tr>`).join("")
-    : `<tr><td colspan="5"><div class="empty-note">لا توجد حركات مسجّلة بعد.</div></td></tr>`;
+  // خريطة اسم الصنف → الفئة، لاستخدامها في تصفية الحركات حسب الفئة المختارة للطباعة
+  const nameToCat = {};
+  state.items.forEach(i => { nameToCat[i.name] = i.category || "بدون فئة"; });
+  const getAllowedCats = () => {
+    const boxes = $$(".cat-filter-item");
+    if (!boxes.length) return null;
+    return new Set(boxes.filter(b => b.checked).map(b => b.value));
+  };
+  const updateMasterCatCheckbox = () => {
+    const boxes = $$(".cat-filter-item"), allEl = $("#cat-filter-all");
+    if (allEl && boxes.length) allEl.checked = boxes.every(b => b.checked);
+  };
 
-  const lowStock = state.items.filter(i => statusOf(i) !== "ok").sort((a, b) => pctOf(a) - pctOf(b));
-  $("#low-stock-list").innerHTML = lowStock.length ? lowStock.map(it => `
-    <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:9px;">
-      <div style="width:160px; font-size:13.3px; font-weight:700;">${it.name}</div>
-      <div style="flex:1;">${tape(it, true)}</div>
-      <div class="mono" style="width:110px; font-size:12px; color:var(--ink70);">${Math.round(pctOf(it))}% (${it.qty}/${it.max_qty})</div>
-      ${pill(statusOf(it))}
-    </div>`).join("") : `<div class="empty-note">لا توجد أصناف منخفضة حاليًا.</div>`;
+  let lowStock = [], cons = [];
+  const refreshScopedLists = () => {
+    const allowed = getAllowedCats();
+    const passCat = (c) => !allowed || allowed.has(c);
 
-  const consMap = {};
-  state.transactions.filter(t => t.type === "out").forEach(t => { consMap[t.item_name] = (consMap[t.item_name] || 0) + Number(t.qty); });
-  const cons = Object.entries(consMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxCons = Math.max(1, ...cons.map(c => c[1]));
-  $("#consumption-list").innerHTML = cons.length ? cons.map(([name, val]) => `
-    <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-      <div style="width:160px; font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
-      <div style="flex:1; background:var(--paper-deep); border-radius:8px; height:16px; position:relative; overflow:hidden;">
-        <div style="position:absolute; inset:0; width:${(val / maxCons) * 100}%; background:var(--mustard); border-radius:8px;"></div>
-      </div>
-      <div class="mono" style="width:46px; font-size:12.5px; font-weight:700;">${val}</div>
-    </div>`).join("") : `<div class="empty-note">لا توجد عمليات سحب مسجّلة بعد.</div>`;
+    // الملخص اليومي: تجميع الحركات حسب اليوم (الوقت الدقيق لكل حركة يظهر بسجل الحركات بالأسفل)
+    const dailyMap = {};
+    state.transactions.filter(tx => passCat(nameToCat[tx.item_name] || "بدون فئة")).forEach(tx => {
+      const day = new Date(tx.created_at).toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" });
+      if (!dailyMap[day]) dailyMap[day] = { inCount: 0, inQty: 0, outCount: 0, outQty: 0 };
+      if (tx.type === "in") { dailyMap[day].inCount++; dailyMap[day].inQty += Number(tx.qty); }
+      else { dailyMap[day].outCount++; dailyMap[day].outQty += Number(tx.qty); }
+    });
+    const dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
+    $("#daily-body").innerHTML = dailyRows.length ? dailyRows.map(([day, d]) => `
+      <tr><td style="font-weight:700;" class="mono">${day}</td><td class="mono">${d.inCount}</td><td class="mono" style="color:var(--green);">+${d.inQty}</td>
+      <td class="mono">${d.outCount}</td><td class="mono" style="color:var(--red);">-${d.outQty}</td></tr>`).join("")
+      : `<tr><td colspan="5"><div class="empty-note">لا توجد حركات مسجّلة بعد.</div></td></tr>`;
+
+    lowStock = state.items.filter(i => statusOf(i) !== "ok" && passCat(i.category || "بدون فئة")).sort((a, b) => pctOf(a) - pctOf(b));
+    $("#low-stock-list").innerHTML = lowStock.length ? lowStock.map(it => `
+      <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:9px;">
+        <div style="width:160px; font-size:13.3px; font-weight:700;">${it.name}</div>
+        <div style="flex:1;">${tape(it, true)}</div>
+        <div class="mono" style="width:110px; font-size:12px; color:var(--ink70);">${Math.round(pctOf(it))}% (${it.qty}/${it.max_qty})</div>
+        ${pill(statusOf(it))}
+      </div>`).join("") : `<div class="empty-note">لا توجد أصناف منخفضة ضمن الفئات المختارة.</div>`;
+
+    const consMap = {};
+    state.transactions.filter(tx => tx.type === "out" && passCat(nameToCat[tx.item_name] || "بدون فئة")).forEach(tx => { consMap[tx.item_name] = (consMap[tx.item_name] || 0) + Number(tx.qty); });
+    cons = Object.entries(consMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const maxCons = Math.max(1, ...cons.map(c => c[1]));
+    $("#consumption-list").innerHTML = cons.length ? cons.map(([name, val]) => `
+      <div class="report-row" style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+        <div style="width:160px; font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</div>
+        <div style="flex:1; background:var(--paper-deep); border-radius:8px; height:16px; position:relative; overflow:hidden;">
+          <div style="position:absolute; inset:0; width:${(val / maxCons) * 100}%; background:var(--mustard); border-radius:8px;"></div>
+        </div>
+        <div class="mono" style="width:46px; font-size:12.5px; font-weight:700;">${val}</div>
+      </div>`).join("") : `<div class="empty-note">لا توجد عمليات سحب ضمن الفئات المختارة.</div>`;
+  };
+  refreshScopedLists();
 
   const drawTx = () => {
     const range = $("#range-filter").value, type = $("#type-filter").value;
     const itemFilter = $("#item-filter").value, workerFilter = ($("#worker-filter").value || "").trim().toLowerCase();
     const fromVal = $("#date-from").value, toVal = $("#date-to").value;
+    const allowedCats = getAllowedCats();
     let cutoffFrom = null, cutoffTo = null;
     if (fromVal || toVal) {
       if (fromVal) cutoffFrom = new Date(fromVal + "T00:00:00");
@@ -877,6 +937,7 @@ function renderReports(main) {
       if (type !== "all" && t.type !== type) return false;
       if (itemFilter !== "all" && t.item_name !== itemFilter) return false;
       if (workerFilter && !(t.worker || "").toLowerCase().includes(workerFilter)) return false;
+      if (allowedCats && !allowedCats.has(nameToCat[t.item_name] || "بدون فئة")) return false;
       return true;
     });
     $("#tx-count").textContent = `${filtered.length} حركة`;
@@ -891,6 +952,8 @@ function renderReports(main) {
     return filtered;
   };
   let currentFiltered = drawTx();
+  $("#cat-filter-all").onchange = (e) => { $$(".cat-filter-item").forEach(cb => cb.checked = e.target.checked); refreshScopedLists(); currentFiltered = drawTx(); };
+  $$(".cat-filter-item").forEach(cb => cb.onchange = () => { updateMasterCatCheckbox(); refreshScopedLists(); currentFiltered = drawTx(); });
   if (state.pendingItemFilter) {
     const itemSel = $("#item-filter");
     if ([...itemSel.options].some(o => o.value === state.pendingItemFilter)) {
@@ -1197,8 +1260,9 @@ function renderItemsAdmin(main) {
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:18px; max-width:620px;">
-      <div class="card-title" style="margin-bottom:10px;">${icon("download", 17)} استيراد أصناف من Excel</div>
+    <details class="collapsible-card" style="max-width:620px;">
+      <summary>${icon("download", 17)} استيراد أصناف من Excel <svg class="chev" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+      <div class="collapsible-body">
       <div style="font-size:12.5px; color:var(--ink70); margin-bottom:10px;">بيضيف مئات الأصناف دفعة واحدة من ملف Excel. اتبع الخطوات بالترتيب:</div>
       <ol style="font-size:12.5px; color:var(--ink70); margin:0 0 14px; padding-right:20px; line-height:2;">
         <li>اضغط <b>"تنزيل قالب Excel"</b> تحت — هيوصلك ملف فيه صف مثال (اسمه واضح "مثال — احذفه") + شيت تعليمات.</li>
@@ -1224,7 +1288,8 @@ function renderItemsAdmin(main) {
         </label>
       </div>
       <div id="import-status" style="margin-top:12px; font-size:12.5px;"></div>
-    </div>
+      </div>
+    </details>
 
     <div class="section-header"><div style="font-weight:800; font-size:16px;">${t("itemsTitle")}</div>
       <button class="btn-dark" id="new-item-btn">${icon("plus", 15)} ${t("newItemBtn")}</button></div>
@@ -1379,12 +1444,20 @@ function renderItemsAdmin(main) {
     await loadCategories(); renderItemsAdmin(main); toast("تمت إضافة الفئة");
   };
 
+  const collapsedItemCats = new Set();
   const drawItems = () => {
     const q = ($("#items-search").value || "").toLowerCase().trim();
     const filtered = q ? state.items.filter(it => it.name.toLowerCase().includes(q) || (it.code || "").toLowerCase().includes(q)) : state.items;
     const isNew = (it) => it.created_at && (Date.now() - new Date(it.created_at).getTime()) < 48 * 3600 * 1000; // آخر 48 ساعة
-    $("#items-body").innerHTML = filtered.length ? filtered.map(it => `
-      <tr><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td>
+    if (!filtered.length) { $("#items-body").innerHTML = `<tr><td colspan="9"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`; return; }
+    const groups = {};
+    filtered.forEach(it => { const c = it.category || "بدون فئة"; (groups[c] = groups[c] || []).push(it); });
+    $("#items-body").innerHTML = Object.entries(groups).map(([catName, catItems]) => {
+      const isCollapsed = collapsedItemCats.has(catName);
+      return `
+      <tr class="cat-row ${isCollapsed ? "is-collapsed" : ""}" data-icat-toggle="${catName}"><td colspan="9" style="background:var(--paper-deep); font-weight:800; font-size:12.5px; padding:8px 16px; border-top:2px solid var(--mustard);"><span class="cat-chevron">${icon("chevronDown", 13)}</span>${catName} <span style="font-weight:600; color:var(--ink50); font-size:11.5px;">(${catItems.length} صنف)</span></td></tr>
+      ${catItems.map(it => `
+      <tr data-icat-row="${catName}" style="${isCollapsed ? "display:none;" : ""}"><td class="mono" style="font-weight:700; color:var(--mustard);">${it.code || "—"}</td>
       <td style="font-weight:700;">${it.name} ${isNew(it) ? `<span class="pill pill-ok" style="margin-right:6px;">جديد</span>` : ""}</td>
       <td style="color:var(--ink70);">${it.category || "—"}</td><td>${it.unit}</td>
       <td class="mono">${it.qty}</td><td class="mono">${it.max_qty}</td>
@@ -1394,7 +1467,8 @@ function renderItemsAdmin(main) {
         <button class="icon-btn" style="color:var(--green);" data-quick-add="${it.id}" title="إضافة كمية سريعًا">${icon("plus", 14)}</button>
         <button class="icon-btn" data-edit="${it.id}">${icon("pencil", 14)}</button>
         <button class="icon-btn" style="color:var(--red);" data-del="${it.id}">${icon("trash", 14)}</button>
-      </div></td></tr>`).join("") : `<tr><td colspan="9"><div class="empty-note">لا توجد نتائج مطابقة.</div></td></tr>`;
+      </div></td></tr>`).join("")}`;
+    }).join("");
     $$("[data-edit]").forEach(b => b.onclick = () => openItemModal(state.items.find(i => i.id === b.dataset.edit)));
     $$("[data-quick-add]").forEach(b => b.onclick = () => openQuickAddQtyModal(state.items.find(i => i.id === b.dataset.quickAdd), main));
     $$("[data-del]").forEach(b => b.onclick = async () => {
@@ -1403,6 +1477,12 @@ function renderItemsAdmin(main) {
       await sb.from("items").delete().eq("id", it.id);
       logAudit({ action: "حذف صنف", entity: "item", entityName: it.name });
       await loadItems(); renderItemsAdmin(main); toast("تم حذف الصنف");
+    });
+    $$("[data-icat-toggle]").forEach(row => row.onclick = () => {
+      const cat = row.dataset.icatToggle;
+      if (collapsedItemCats.has(cat)) collapsedItemCats.delete(cat); else collapsedItemCats.add(cat);
+      row.classList.toggle("is-collapsed");
+      $$(`[data-icat-row="${cat}"]`).forEach(r => r.style.display = collapsedItemCats.has(cat) ? "none" : "");
     });
   };
   drawItems();
