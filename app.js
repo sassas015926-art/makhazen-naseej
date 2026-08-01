@@ -330,8 +330,13 @@ async function loadSuppliers() {
 }
 async function loadAll() {
   await Promise.all([loadSettings(), loadCategories(), loadItems(), loadTransactions(), loadProfile()]);
-  await Promise.all([loadProfiles(), loadAuditLog(), loadSuppliers()]);
 }
+// تحميل كسول (lazy load): البيانات دي مش لازمة فورًا وقت الدخول، بنجيبها بس أول ما المستخدم
+// يفتح التبويب اللي محتاجها فعليًا — ده بيقلل وقت انتظار تسجيل الدخول بشكل كبير.
+let _profilesLoaded = false, _suppliersLoaded = false, _auditLoaded = false;
+async function ensureProfiles() { if (!_profilesLoaded) { await loadProfiles(); _profilesLoaded = true; } }
+async function ensureSuppliers() { if (!_suppliersLoaded) { await loadSuppliers(); _suppliersLoaded = true; } }
+async function ensureAuditLog() { if (!_auditLoaded) { await loadAuditLog(); _auditLoaded = true; } }
 
 /* ---------------- app boot ---------------- */
 async function boot() {
@@ -641,7 +646,7 @@ function renderMoveBody(mode) {
           <div class="empty-note">لا توجد أصناف مطابقة لـ "${$("#move-search").value}".</div>
           <button class="btn-dark" id="quick-add-item">${icon("plus", 14)} إضافة صنف جديد باسم "${$("#move-search").value}"</button>`;
         const qa = $("#quick-add-item");
-        if (qa) qa.onclick = () => openItemModal(null, $("#move-search").value, () => renderMoveBody(mode));
+        if (qa) qa.onclick = async () => { await ensureSuppliers(); openItemModal(null, $("#move-search").value, () => renderMoveBody(mode)); };
         return;
       }
       // تجميع الأصناف تحت عناوين الفئات (مثال: خيوط -> كل أنواع الخيوط تحتها)
@@ -1249,7 +1254,8 @@ function printVoucher(tx) {
 }
 
 /* ---------------- إدارة الأصناف والفئات (المدير وأمين المخزن) ---------------- */
-function renderItemsAdmin(main) {
+async function renderItemsAdmin(main) {
+  if (!_suppliersLoaded) { main.innerHTML = `<div class="empty-note">جاري تحميل البيانات...</div>`; await ensureSuppliers(); if (state.tab !== "items") return; }
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${t("itemsAdminTitle")}</div><div class="section-sub">${t("itemsAdminSub")}</div></div></div>
 
@@ -1539,7 +1545,8 @@ function openQuickAddQtyModal(item, main) {
 }
 
 /* ---------------- الموردون (المدير وأمين المخزن) ---------------- */
-function renderSuppliers(main) {
+async function renderSuppliers(main) {
+  if (!_suppliersLoaded) { main.innerHTML = `<div class="empty-note">جاري تحميل بيانات الموردين...</div>`; await ensureSuppliers(); if (state.tab !== "suppliers") return; }
   main.innerHTML = `
     <div class="section-header">
       <div><div class="section-title">${t("suppliersTitle")}</div><div class="section-sub">${t("suppliersSub")}</div></div>
@@ -1615,7 +1622,8 @@ function openSupplierModal(existing, main) {
 }
 
 /* ---------------- user management (admin only) ---------------- */
-function renderUsers(main) {
+async function renderUsers(main) {
+  if (!_profilesLoaded) { main.innerHTML = `<div class="empty-note">جاري تحميل بيانات المستخدمين...</div>`; await ensureProfiles(); if (state.tab !== "users") return; }
   const roleLabels = ROLE_LABELS;
   main.innerHTML = `
     <div class="section-header">
@@ -1739,7 +1747,8 @@ function openNewUserModal(main) {
 }
 
 /* ---------------- audit log view ---------------- */
-function renderAudit(main) {
+async function renderAudit(main) {
+  if (!_auditLoaded) { main.innerHTML = `<div class="empty-note">جاري تحميل سجل الأنشطة...</div>`; await ensureAuditLog(); if (state.tab !== "audit") return; }
   main.innerHTML = `
     <div class="section-header"><div><div class="section-title">${t("auditTitle")}</div><div class="section-sub">${t("auditSub")}</div></div></div>
     <div class="card" style="padding:0; overflow:hidden;">
