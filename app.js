@@ -23,6 +23,8 @@ const ICONS = {
   scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 };
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -1638,7 +1640,11 @@ function renderUsers(main) {
       </td>
       <td style="color:var(--ink70); font-size:12.5px;" class="mono">${p.last_login ? fmtDate(p.last_login) : "—"}</td>
       <td style="color:var(--ink70); font-size:12.5px;">${p.last_login_device || "—"}</td>
-      <td>${p.id === state.user.id ? "" : `<button class="icon-btn" style="color:var(--red);" data-del-user="${p.id}">${icon("trash", 14)}</button>`}</td>
+      <td><div style="display:flex; gap:6px; justify-content:flex-end;">
+        <button class="icon-btn" data-edit-user="${p.id}" title="تعديل الاسم / اسم المستخدم">${icon("pencil", 14)}</button>
+        ${p.id === state.user.id ? "" : `<button class="icon-btn" style="color:var(--mustard);" data-reset-pass="${p.id}" title="إعادة تعيين كلمة المرور">${icon("key", 14)}</button>`}
+        ${p.id === state.user.id ? "" : `<button class="icon-btn" style="color:var(--red);" data-del-user="${p.id}">${icon("trash", 14)}</button>`}
+      </div></td>
     </tr>`).join("");
   $$("[data-role]").forEach(sel => sel.onchange = async () => {
     const { error } = await sb.from("profiles").update({ role: sel.value }).eq("id", sel.dataset.role);
@@ -1654,6 +1660,12 @@ function renderUsers(main) {
     if (res.error) { toast(res.error, true); return; }
     logAudit({ action: "حذف حساب مستخدم نهائيًا", entity: "user", entityName: p.full_name });
     await loadProfiles(); renderUsers(main); toast("تم حذف الحساب نهائيًا");
+  });
+  $$("[data-edit-user]").forEach(btn => btn.onclick = () => {
+    openEditUserModal(state.profiles.find(x => x.id === btn.dataset.editUser), main);
+  });
+  $$("[data-reset-pass]").forEach(btn => btn.onclick = () => {
+    openResetPasswordModal(state.profiles.find(x => x.id === btn.dataset.resetPass), main);
   });
   $("#new-user-btn").onclick = () => openNewUserModal(main);
   $$("[data-toggle]").forEach(btn => btn.onclick = async () => {
@@ -1718,6 +1730,8 @@ function openNewUserModal(main) {
     const res = await callManageUsers({ action: "create", email, password, fullName, role });
     btn.disabled = false; btn.textContent = "إنشاء الحساب";
     if (res.error) { toast(res.error, true); return; }
+    const newUserId = res.userId || res.user?.id || res.id;
+    if (newUserId) await sb.from("profiles").update({ username }).eq("id", newUserId);
     logAudit({ action: "إنشاء حساب مستخدم", entity: "user", entityName: fullName || username, details: `الدور: ${roleLabels[role]}` });
     overlay.remove();
     await loadProfiles(); renderUsers(main); toast(`تم إنشاء الحساب — اسم المستخدم: ${username}`);
@@ -1973,32 +1987,137 @@ function openAboutModal() {
   $("#about-close", overlay).onclick = () => overlay.remove();
 }
 
-function openChangePasswordModal() {
+function openEditUserModal(p, main) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
     <div class="modal-box">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <div style="font-weight:800; font-size:16px;">تغيير كلمة المرور</div>
-        <button class="close-x" id="cp-close">${icon("x", 15)}</button>
+        <div style="font-weight:800; font-size:16px;">${icon("pencil", 16)} تعديل بيانات المستخدم</div>
+        <button class="close-x" id="eu-close">${icon("x", 15)}</button>
       </div>
+      <div class="field"><label>الاسم الكامل</label><input id="eu-fullname" class="input" style="width:100%;" value="${p.full_name || ""}"></div>
+      <div class="field">
+        <label>اسم المستخدم (لتسجيل الدخول)</label>
+        <input id="eu-username" class="input" style="width:100%;" value="${(p.username || "")}" placeholder="مثال: ahmed">
+        <div style="font-size:11px; color:var(--ink50); margin-top:6px;">بالإنجليزي وبدون مسافات. تغييره يحتاج إعادة نشر Edge Function (راجع README).</div>
+      </div>
+      <button class="btn-primary" id="eu-save">حفظ التعديلات</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#eu-close", overlay).onclick = () => overlay.remove();
+  $("#eu-save", overlay).onclick = async () => {
+    const newName = $("#eu-fullname", overlay).value.trim();
+    const newUsername = $("#eu-username", overlay).value.trim().toLowerCase();
+    if (!newName) { toast("اكتب الاسم الكامل", true); return; }
+    const btn = $("#eu-save", overlay); btn.disabled = true; btn.textContent = "جاري الحفظ...";
+    if (newName !== p.full_name) {
+      const { error } = await sb.from("profiles").update({ full_name: newName }).eq("id", p.id);
+      if (error) { toast("تعذر تحديث الاسم — " + (error.message || ""), true); btn.disabled = false; btn.textContent = "حفظ التعديلات"; return; }
+    }
+    if (newUsername && newUsername !== (p.username || "") && /^[a-z0-9._-]+$/.test(newUsername)) {
+      const res = await callManageUsers({ action: "updateUsername", userId: p.id, newUsername });
+      if (res.error) { toast(res.error, true); btn.disabled = false; btn.textContent = "حفظ التعديلات"; return; }
+    }
+    logAudit({ action: "تعديل بيانات مستخدم", entity: "user", entityName: newName });
+    await loadProfiles(); renderUsers(main); overlay.remove();
+    toast("تم حفظ التعديلات");
+  };
+}
+
+function openResetPasswordModal(p, main) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">${icon("key", 16)} إعادة تعيين كلمة مرور "${p.full_name}"</div>
+        <button class="close-x" id="rp-close">${icon("x", 15)}</button>
+      </div>
+      <div id="rp-step1">
+        <div style="font-size:13px; color:var(--ink70); line-height:1.8; margin-bottom:16px;">
+          هيتم توليد كلمة مرور مؤقتة جديدة للحساب ده. المستخدم هيُطلب منه تغييرها فور تسجيل الدخول. سلّمها له مباشرة (تليفون / واتساب) بدون ما تكتبها في أي مكان تاني.
+        </div>
+        <button class="btn-primary" id="rp-generate">توليد كلمة مرور مؤقتة</button>
+      </div>
+      <div id="rp-step2" class="hidden">
+        <div style="font-size:12.5px; color:var(--ink70); margin-bottom:8px;">كلمة المرور المؤقتة (هتظهر مرة واحدة بس):</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
+          <div id="rp-temp-pass" class="mono" style="flex:1; background:var(--paper-deep); border-radius:10px; padding:12px 14px; font-size:16px; font-weight:800; letter-spacing:1px; text-align:center;"></div>
+          <button class="icon-btn" id="rp-copy" title="نسخ">${icon("copy", 15)}</button>
+        </div>
+        <button class="btn-dark" id="rp-done" style="width:100%;">تم — أغلق</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#rp-close", overlay).onclick = () => overlay.remove();
+  $("#rp-generate", overlay).onclick = async () => {
+    const btn = $("#rp-generate", overlay); btn.disabled = true; btn.textContent = "جاري التوليد...";
+    const res = await callManageUsers({ action: "resetPassword", userId: p.id });
+    if (res.error) { toast(res.error, true); btn.disabled = false; btn.textContent = "توليد كلمة مرور مؤقتة"; return; }
+    logAudit({ action: "إعادة تعيين كلمة مرور", entity: "user", entityName: p.full_name });
+    $("#rp-temp-pass", overlay).textContent = res.tempPassword;
+    $("#rp-step1", overlay).classList.add("hidden");
+    $("#rp-step2", overlay).classList.remove("hidden");
+  };
+  $("#rp-copy", overlay).onclick = () => {
+    navigator.clipboard.writeText($("#rp-temp-pass", overlay).textContent).then(() => toast("تم النسخ"));
+  };
+  $("#rp-done", overlay).onclick = () => overlay.remove();
+}
+
+function openChangePasswordModal(forced) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">${forced ? "لازم تغيّر كلمة المرور المؤقتة" : "تغيير كلمة المرور"}</div>
+        ${forced ? "" : `<button class="close-x" id="cp-close">${icon("x", 15)}</button>`}
+      </div>
+      ${forced ? `<div style="font-size:12.5px; color:var(--ink70); background:var(--amber-soft); padding:10px 12px; border-radius:10px; margin-bottom:14px;">تم إعادة تعيين كلمة مرورك من المدير. اختر كلمة مرور جديدة وخاصة بيك عشان تكمّل.</div>` : ""}
       <div class="field"><label>كلمة المرور الجديدة</label><input id="cp-new" type="password" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
       <div class="field"><label>تأكيد كلمة المرور</label><input id="cp-confirm" type="password" class="input" style="width:100%;" placeholder="أعد كتابتها"></div>
       <button class="btn-primary" id="cp-save">حفظ كلمة المرور الجديدة</button>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-  $("#cp-close", overlay).onclick = () => overlay.remove();
+  if (!forced) { overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); }; $("#cp-close", overlay).onclick = () => overlay.remove(); }
   $("#cp-save", overlay).onclick = async () => {
     const p1 = $("#cp-new", overlay).value, p2 = $("#cp-confirm", overlay).value;
     if (p1.length < 6) { toast("كلمة المرور لازم تكون 6 أحرف على الأقل", true); return; }
     if (p1 !== p2) { toast("كلمتا المرور غير متطابقتين", true); return; }
     const { error } = await sb.auth.updateUser({ password: p1 });
     if (error) { toast("تعذر تغيير كلمة المرور — " + (error.message || ""), true); return; }
+    if (forced) await sb.from("profiles").update({ must_change_password: false }).eq("id", state.user.id);
     logAudit({ action: "تغيير كلمة المرور", entity: "user", entityName: state.profile?.full_name });
     overlay.remove();
     toast("تم تغيير كلمة المرور بنجاح");
   };
+}
+
+function openForgotPasswordModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="font-weight:800; font-size:16px;">${icon("key", 16)} نسيت كلمة المرور؟</div>
+        <button class="close-x" id="fp-close">${icon("x", 15)}</button>
+      </div>
+      <div style="font-size:13px; color:var(--ink70); line-height:2;">
+        محدّش يقدر يعمل استعادة لنفسه — ده أأمن لبيانات المصنع. كل اللي محتاجه:
+        <ol style="padding-right:18px; margin-top:8px;">
+          <li>كلّم <b>مدير النظام</b> (تليفون أو واتساب).</li>
+          <li>هو هيدخل تبويب "إدارة المستخدمين" ويضغط 🔑 جنب اسمك.</li>
+          <li>هيبعتلك كلمة مرور مؤقتة، وهيُطلب منك تغييرها أول ما تدخل.</li>
+        </ol>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  $("#fp-close", overlay).onclick = () => overlay.remove();
 }
 
 /* ---------------- منع تسجيل الدخول المتكرر (حماية بسيطة من محاولات القوة الغاشمة) ---------------- */
@@ -2052,6 +2171,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await sb.from("profiles").update({ last_login: new Date().toISOString(), last_login_device: deviceInfo() }).eq("id", user.id);
       logAudit({ action: "تسجيل دخول", entity: "user", entityName: state.profile?.full_name || username });
       showApp();
+      if (state.profile && state.profile.must_change_password) openChangePasswordModal(true);
     } catch (err) {
       recordLoginFailure(username.toLowerCase());
       const lockMsg2 = checkLoginLock(username.toLowerCase());
@@ -2062,7 +2182,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   $("#logout-btn").addEventListener("click", () => doLogout());
-  $("#change-pass-btn").addEventListener("click", openChangePasswordModal);
+  $("#sidebar-toggle-btn").addEventListener("click", () => {
+    $("#app-shell").classList.toggle("sidebar-collapsed");
+  });
+  $("#change-pass-btn").addEventListener("click", () => openChangePasswordModal(false));
+  $("#forgot-pass-link").addEventListener("click", openForgotPasswordModal);
   $("#help-btn").addEventListener("click", openHelpModal);
   $("#about-btn").addEventListener("click", openAboutModal);
   $("#mobile-menu-btn").addEventListener("click", () => {

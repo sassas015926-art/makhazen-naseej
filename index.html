@@ -34,6 +34,9 @@
           <label id="login-pass-label">كلمة المرور</label>
           <input id="login-password" type="password" autocomplete="current-password" required placeholder="••••••••">
         </div>
+        <div style="text-align:left; margin-bottom:14px; margin-top:-8px;">
+          <button type="button" id="forgot-pass-link" style="background:none; color:var(--mustard); font-size:12px; font-weight:700;">نسيت كلمة المرور؟</button>
+        </div>
         <button type="submit" id="login-submit" class="btn-primary">تسجيل الدخول</button>
       </form>
     </div>
@@ -69,6 +72,7 @@
       </aside>
       <div class="content-col">
         <div class="topbar" style="gap:8px;">
+          <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="إظهار/إخفاء القائمة">☰</button>
           <div style="flex:1;"></div>
           <button class="bell-btn" id="help-btn" title="المساعدة">؟</button>
           <button class="bell-btn" id="about-btn" title="حول النظام">ⓘ</button>
