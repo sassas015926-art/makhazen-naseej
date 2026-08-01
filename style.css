@@ -126,7 +126,7 @@ a{color:inherit;}
 /* ==========================================================================
    2. هيكل التطبيق العام
    ========================================================================== */
-#app-shell{display:flex; min-height:100vh;}
+#app-shell{display:flex; flex-direction:column; min-height:100vh;}
 .alert-banner{
   background:linear-gradient(90deg, #C7433C, #D6473F); color:#fff;
   display:flex; flex-direction:column; box-shadow:0 2px 10px rgba(214,71,63,.22); animation:fadeInUp .3s ease;
@@ -152,7 +152,7 @@ a{color:inherit;}
   display:flex; align-items:center; gap:6px; cursor:pointer; transition:background .15s ease;
 }
 .alert-chip:hover{background:rgba(255,255,255,.26);}
-.layout{display:flex; width:100%;}
+.layout{display:flex; width:100%; flex:1; min-height:0;}
 
 aside{
   width:246px; background:var(--sidebar-bg); color:#fff; flex-shrink:0;
