@@ -1072,7 +1072,19 @@ function renderSettings(main) {
       <div class="card-title" style="margin-bottom:6px;">${icon("alert", 17)} إشعارات المخزون المنخفض (إيميل وتليجرام)</div>
       <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">لما أي صنف يوصل لمستوى منخفض أو حرج، النظام يبعت إشعار تلقائي فورًا. الخطوات الكاملة لإنشاء المفاتيح موجودة في ملف <code>migration_notifications.sql</code>.</div>
       <div class="field"><label>إيميلات الإشعارات (مفصولة بفاصلة)</label><input id="ws-emails" class="input" style="width:100%;" value="${state.settings.notify_emails || ""}" placeholder="admin@example.com, manager@example.com"></div>
-      <div class="field"><label>مفتاح Resend (لإرسال الإيميلات)</label><input id="ws-resend" class="input" style="width:100%;" value="${state.settings.resend_api_key || ""}" placeholder="re_xxxxxxxx"></div>
+      <div class="field">
+        <label>مفتاح Resend (لإرسال الإيميلات)</label>
+        <input id="ws-resend" class="input" style="width:100%;" value="${state.settings.resend_api_key || ""}" placeholder="re_xxxxxxxx">
+        <div id="resend-key-status" style="font-size:11.5px; margin-top:6px; min-height:16px;"></div>
+      </div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
+        <label>اختبار إرسال بريد إلكتروني حقيقي</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
+          <input id="ws-test-email-to" class="input" style="flex:1; min-width:200px;" value="${(state.settings.notify_emails || "").split(",")[0].trim()}" placeholder="ابعت الاختبار على إيميل إيه؟ مثال: you@example.com">
+          <button class="btn-dark" id="ws-test-email" type="button">${icon("alert", 14)} إرسال بريد اختباري</button>
+        </div>
+        <div id="test-email-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+      </div>
       <div style="display:flex; gap:10px;">
         <div class="field" style="flex:1;"><label>توكن بوت تليجرام</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
         <div class="field" style="flex:1;"><label>Chat ID تليجرام</label><input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789"></div>
@@ -1112,9 +1124,29 @@ function renderSettings(main) {
   };
 
   $("#ws-save-notify").onclick = async () => {
+    const saveBtn = $("#ws-save-notify");
+    const statusEl = $("#resend-key-status");
+    const resendKey = $("#ws-resend").value.trim();
+    statusEl.textContent = ""; statusEl.style.color = "";
+
+    // لا نسمح بحفظ مفتاح Resend غير صحيح — نتحقق منه فعليًا مع Resend قبل أي حفظ
+    if (resendKey) {
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من المفتاح...";
+      const check = await callEmailService({ action: "validate", apiKey: resendKey });
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
+      if (check.error || !check.valid) {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || "مفتاح Resend غير صحيح") : check.error);
+        toast("لم يتم الحفظ — مفتاح Resend غير صحيح", true);
+        return; // إيقاف الحفظ تمامًا — مفيش حفظ لمفتاح غلط
+      }
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = "✓ تم التحقق من المفتاح بنجاح";
+    }
+
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
-      resend_api_key: $("#ws-resend").value.trim(),
+      resend_api_key: resendKey,
       telegram_bot_token: $("#ws-tg-token").value.trim(),
       telegram_chat_id: $("#ws-tg-chat").value.trim(),
       updated_at: new Date().toISOString(),
@@ -1124,6 +1156,31 @@ function renderSettings(main) {
     await loadSettings();
     logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
     toast("تم حفظ إعدادات الإشعارات");
+  };
+
+  $("#ws-test-email").onclick = async () => {
+    const testBtn = $("#ws-test-email");
+    const statusEl = $("#test-email-status");
+    const resendKey = $("#ws-resend").value.trim();
+    const to = $("#ws-test-email-to").value.trim();
+    statusEl.textContent = ""; statusEl.style.color = "";
+
+    if (!resendKey) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب مفتاح Resend الأول قبل الاختبار"; return; }
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب إيميل صحيح لاستقبال رسالة الاختبار"; return; }
+
+    testBtn.disabled = true; testBtn.textContent = "جاري الإرسال...";
+    const res = await callEmailService({ action: "sendTest", apiKey: resendKey, to });
+    testBtn.disabled = false; testBtn.textContent = "إرسال بريد اختباري";
+
+    if (res.error || res.success === false) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ فشل الإرسال — " + (res.reason || res.error || "خطأ غير معروف");
+      toast("فشل إرسال البريد الاختباري", true);
+    } else {
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = `✓ تم إرسال البريد بنجاح إلى ${to} — تأكد إنه وصل (وتحقق من مجلد Spam لو ملقيتوش)`;
+      toast("تم إرسال البريد الاختباري بنجاح");
+    }
   };
 }
 
@@ -1700,6 +1757,23 @@ async function callManageUsers(payload) {
     return json;
   } catch (e) {
     return { error: "تعذر الاتصال بخدمة إدارة المستخدمين — تأكد إن الـ Edge Function متنشرة (راجع README)" };
+  }
+}
+
+/* ---------------- استدعاء Edge Function الخاصة بخدمة البريد الإلكتروني (Resend) ---------------- */
+async function callEmailService(payload) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/email-service`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || "حدث خطأ غير متوقع" };
+    return json;
+  } catch (e) {
+    return { error: "تعذر الاتصال بخدمة البريد الإلكتروني — تأكد إن الـ Edge Function \"email-service\" متنشرة على Supabase" };
   }
 }
 
