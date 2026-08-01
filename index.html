@@ -45,16 +45,25 @@
   <!-- ================= التطبيق بعد الدخول ================= -->
   <div id="app-shell" class="hidden">
     <div id="alert-banner" class="alert-banner hidden"></div>
+    <header class="top-header">
+      <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="إظهار/إخفاء القائمة">☰</button>
+      <div class="brand">
+        <div class="logo" id="side-logo"></div>
+        <div>
+          <div class="brand-name" id="brand-name">مصنع نسيج</div>
+          <div class="brand-sub" id="brand-sub">إدارة المخازن</div>
+        </div>
+      </div>
+      <div class="header-spacer" style="flex:1;"></div>
+      <button class="bell-btn" id="help-btn" title="المساعدة">؟</button>
+      <button class="bell-btn" id="about-btn" title="حول النظام">ⓘ</button>
+      <div style="position:relative;">
+        <button class="bell-btn" id="bell-btn">🔔<span class="bell-badge hidden" id="bell-badge">0</span></button>
+        <div class="bell-dropdown hidden" id="bell-dropdown"></div>
+      </div>
+    </header>
     <div class="layout">
       <aside id="sidebar">
-        <div class="brand">
-          <div class="logo" id="side-logo"></div>
-          <div>
-            <div class="brand-name" id="brand-name">مصنع نسيج</div>
-            <div class="brand-sub" id="brand-sub">إدارة المخازن</div>
-          </div>
-          <button id="mobile-menu-btn" class="mobile-menu-btn">☰</button>
-        </div>
         <div id="nav-list"></div>
         <div id="mobile-extra-controls">
           <div class="who">
@@ -67,20 +76,14 @@
             <button type="button" class="lang-btn" data-lang="ar">AR</button>
             <button type="button" class="lang-btn" data-lang="tr">TR</button>
           </div>
+          <div style="display:flex; gap:6px; padding:8px 6px 0;">
+            <button type="button" class="lang-btn" id="help-btn-mobile">؟ مساعدة</button>
+            <button type="button" class="lang-btn" id="about-btn-mobile">ⓘ حول النظام</button>
+          </div>
         </div>
         <div class="nav-footer">البيانات محفوظة تلقائيًا ومشتركة بين كل العاملين المسجّلين</div>
       </aside>
       <div class="content-col">
-        <div class="topbar" style="gap:8px;">
-          <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="إظهار/إخفاء القائمة">☰</button>
-          <div style="flex:1;"></div>
-          <button class="bell-btn" id="help-btn" title="المساعدة">؟</button>
-          <button class="bell-btn" id="about-btn" title="حول النظام">ⓘ</button>
-          <div style="position:relative;">
-            <button class="bell-btn" id="bell-btn">🔔<span class="bell-badge hidden" id="bell-badge">0</span></button>
-            <div class="bell-dropdown hidden" id="bell-dropdown"></div>
-          </div>
-        </div>
         <main id="main"></main>
       </div>
     </div>

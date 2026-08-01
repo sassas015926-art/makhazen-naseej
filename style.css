@@ -171,15 +171,27 @@ aside{
   transition:all .15s ease; flex-shrink:0;
 }
 .sidebar-toggle-btn:hover{border-color:var(--mustard); color:var(--mustard);}
-.brand{display:flex; align-items:center; gap:11px; padding:2px 6px 20px; border-bottom:1px solid rgba(255,255,255,.09); margin-bottom:16px;}
+
+.top-header{
+  display:flex; align-items:center; gap:14px; padding:12px 24px;
+  background:var(--sidebar-bg); color:#fff; position:sticky; top:0; z-index:80;
+  box-shadow:0 2px 12px rgba(0,0,0,.14); flex-wrap:wrap;
+}
+.top-header .sidebar-toggle-btn{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.16); color:#fff;}
+.top-header .sidebar-toggle-btn:hover{background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.32); color:#fff;}
+.top-header .bell-btn{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.16); color:#fff; box-shadow:none;}
+.top-header .bell-btn:hover{background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.32); color:#fff;}
+.top-header .bell-dropdown{color:var(--ink);}
+
+.brand{display:flex; align-items:center; gap:11px;}
 .brand .logo{
   width:38px; height:38px; border-radius:11px; background:var(--grad-primary);
   display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;
   box-shadow:0 4px 14px rgba(23,137,160,.35);
 }
 .brand .logo img{width:100%; height:100%; object-fit:cover;}
-.brand-name{font-weight:800; font-size:15px; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.brand-sub{font-size:11px; color:rgba(255,255,255,.5); margin-top:2px; font-weight:600;}
+.brand-name{font-weight:800; font-size:15px; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff;}
+.brand-sub{font-size:11px; color:rgba(255,255,255,.55); margin-top:2px; font-weight:600;}
 
 .nav-btn{
   display:flex; align-items:center; gap:11px; padding:10.5px 13px; border-radius:11px; background:transparent;
@@ -201,6 +213,7 @@ aside{
 }
 .nav-footer{margin-top:auto; padding-top:16px; font-size:10.8px; color:rgba(255,255,255,.35); line-height:1.5;}
 .who{display:flex; align-items:center; gap:8px; padding:11px 8px; margin-top:8px; border-top:1px solid rgba(255,255,255,.09);}
+#help-btn-mobile, #about-btn-mobile{display:none;}
 .who-name{font-size:12.5px; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .logout-btn{background:rgba(255,255,255,.07); color:#fff; font-size:11.5px; padding:6px 10px; border-radius:9px; transition:background .15s ease;}
 .logout-btn:hover{background:rgba(255,255,255,.15);}
@@ -391,7 +404,7 @@ details.collapsible-card > summary:hover{background:var(--paper);}
 @page{ size:A4; margin:1.4cm; }
 
 @media print{
-  aside, .alert-banner, .no-print, #login-screen{display:none !important;}
+  aside, .alert-banner, .top-header, .no-print, #login-screen{display:none !important;}
   body, #app-shell, .layout, main{background:#fff !important; padding:0 !important; margin:0 !important; min-height:0 !important;}
   main{overflow:visible !important;}
   .print-only{display:block !important;}
@@ -419,17 +432,20 @@ details.collapsible-card > summary:hover{background:var(--paper);}
 /* ==========================================================================
    10. الاستجابة للشاشات الصغيرة
    ========================================================================== */
-.mobile-menu-btn{display:none;}
 
 @media (max-width:860px){
-  .sidebar-toggle-btn{display:none;}
+  .sidebar-toggle-btn{display:flex; order:1;}
+  .top-header{padding:10px 14px; gap:10px; justify-content:flex-start;}
+  .top-header .header-spacer{display:none;}
+  .top-header .brand{order:2; margin-inline-start:auto; min-width:0;}
+  .top-header #help-btn, .top-header #about-btn{display:none;}
+  #help-btn-mobile, #about-btn-mobile{display:block;}
+  .top-header > div:last-child{order:3;}
+  .brand-name{max-width:150px;}
+  .brand-sub{display:none;}
   .layout{flex-direction:column;}
   aside{width:100%; flex-direction:column; align-items:stretch; padding:0; overflow:visible; position:relative; z-index:80; box-shadow:0 2px 14px rgba(0,0,0,.15);}
-  .brand{border:none; margin:0; padding:12px 16px; flex-shrink:0; position:relative;}
-  .brand-sub{display:none;}
-  .mobile-menu-btn{display:flex; align-items:center; justify-content:center; width:40px; height:40px; background:rgba(255,255,255,.08); border:none; border-radius:11px; color:#fff; font-size:18px; margin-right:auto; transition:background .15s ease;}
-  .mobile-menu-btn:hover{background:rgba(255,255,255,.15);}
-  #nav-list{display:none; flex-direction:column; gap:2px; padding:6px 10px 0; background:transparent;}
+  #nav-list{display:none; flex-direction:column; gap:2px; padding:10px 10px 0; background:transparent;}
   #nav-list.mobile-open{display:flex; animation:fadeIn .18s ease;}
   #mobile-extra-controls{display:none; padding:10px 10px 14px; background:transparent; border-top:1px solid rgba(255,255,255,.1); margin-top:8px;}
   #mobile-extra-controls.mobile-open{display:block;}
@@ -439,7 +455,6 @@ details.collapsible-card > summary:hover{background:var(--paper);}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .dash-grid-main, .dash-grid-charts{grid-template-columns:1fr;}
   main{padding:14px;}
-  .topbar{padding:10px 14px 0;}
 
   .card{padding:15px;}
   .card[style*="padding:0"]{overflow-x:auto; -webkit-overflow-scrolling:touch;}

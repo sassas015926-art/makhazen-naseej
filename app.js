@@ -2184,14 +2184,14 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#logout-btn").addEventListener("click", () => doLogout());
   $("#sidebar-toggle-btn").addEventListener("click", () => {
     $("#app-shell").classList.toggle("sidebar-collapsed");
+    $("#nav-list").classList.toggle("mobile-open");
+    $("#mobile-extra-controls").classList.toggle("mobile-open");
   });
   $("#change-pass-btn").addEventListener("click", () => openChangePasswordModal(false));
   $("#forgot-pass-link").addEventListener("click", openForgotPasswordModal);
   $("#help-btn").addEventListener("click", openHelpModal);
   $("#about-btn").addEventListener("click", openAboutModal);
-  $("#mobile-menu-btn").addEventListener("click", () => {
-    $("#nav-list").classList.toggle("mobile-open");
-    $("#mobile-extra-controls").classList.toggle("mobile-open");
-  });
+  $("#help-btn-mobile").addEventListener("click", openHelpModal);
+  $("#about-btn-mobile").addEventListener("click", openAboutModal);
   boot();
 });
