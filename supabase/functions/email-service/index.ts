@@ -95,30 +95,38 @@ Deno.serve(async (req) => {
           : { valid: false, reason: badFormatMsg }
       );
     }
+if (action === "validate") {
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: DEFAULT_FROM,
+      to: ["sassas015926@gmail.com"],
+      subject: "اختبار صلاحية مفتاح Resend",
+      html: "<p>تم التحقق من مفتاح Resend بنجاح</p>",
+    }),
+  });
 
-    if (action === "validate") {
-      const r = await fetch("https://api.resend.com/api-keys", {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      });
+  if (r.status === 401 || r.status === 403) {
+    return json({
+      valid: false,
+      reason: "مفتاح Resend غير صحيح أو تم إلغاؤه",
+    });
+  }
 
-      if (r.status === 401 || r.status === 403) {
-        return json({
-          valid: false,
-          reason: "مفتاح Resend غير صحيح أو تم إلغاؤه",
-        });
-      }
+  if (!r.ok) {
+    const error = await r.text();
+    return json({
+      valid: false,
+      reason: `فشل التحقق من Resend: ${error}`,
+    });
+  }
 
-      if (!r.ok) {
-        return json({
-          valid: false,
-          reason: `تعذر التحقق من المفتاح (Resend رجّع كود ${r.status})`,
-        });
-      }
-
-      return json({ valid: true });
-    }
+  return json({ valid: true });
+}
 
     if (action === "sendTest") {
       const { to } = body;
