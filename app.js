@@ -1146,20 +1146,11 @@ function renderSettings(main) {
     const resendKey = $("#ws-resend").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
 
-    // لا نسمح بحفظ مفتاح Resend غير صحيح — نتحقق منه فعليًا مع Resend قبل أي حفظ
-    if (resendKey) {
-      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من المفتاح...";
-      const check = await callEmailService({ action: "validate", apiKey: resendKey });
-      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
-      if (check.error || !check.valid) {
-        statusEl.style.color = "var(--red)";
-        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || "مفتاح Resend غير صحيح") : check.error);
-        toast("لم يتم الحفظ — مفتاح Resend غير صحيح", true);
-        return; // إيقاف الحفظ تمامًا — مفيش حفظ لمفتاح غلط
-      }
-      statusEl.style.color = "var(--green)";
-      statusEl.textContent = "✓ تم التحقق من المفتاح بنجاح";
-    }
+   // مفتاح Resend يتم التحقق منه عبر إرسال الاختبار، لذلك نحفظه مباشرة
+if (resendKey) {
+  statusEl.style.color = "var(--green)";
+  statusEl.textContent = "✓ تم حفظ مفتاح Resend";
+}
 
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
