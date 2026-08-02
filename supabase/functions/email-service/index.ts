@@ -172,7 +172,55 @@ if (action === "validate") {
         id: respBody.id,
       });
     }
+    if (action === "sendLowStockAlert") {
+      const { to, itemName, qty, maxQty, unit, pct } = body;
 
+      if (!Array.isArray(to) || !to.length) {
+        return json({ error: "إيميلات الاستقبال ناقصة" }, 400);
+      }
+
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: DEFAULT_FROM,
+          to,
+          subject: `⚠️ تنبيه مخزون حرج — ${itemName}`,
+          html: `
+            <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;padding:20px;color:#122A4A;">
+              <h2>⚠️ تنبيه مخزون حرج</h2>
+              <p>وصل الصنف إلى المستوى الحرج.</p>
+
+              <p><b>الصنف:</b> ${itemName}</p>
+              <p><b>الكمية الحالية:</b> ${qty} ${unit}</p>
+              <p><b>الحد الأقصى:</b> ${maxQty} ${unit}</p>
+              <p><b>النسبة الحالية:</b> ${Number(pct).toFixed(1)}%</p>
+
+              <p style="color:#888;font-size:12px;margin-top:20px;">
+                نظام إدارة المخازن
+              </p>
+            </div>
+          `,
+        }),
+      });
+
+      const respBody: any = await r.json().catch(() => ({}));
+
+      if (!r.ok) {
+        return json({
+          success: false,
+          reason: respBody.message || `فشل الإرسال (كود ${r.status})`,
+        });
+      }
+
+      return json({
+        success: true,
+        id: respBody.id,
+      });
+    }
     return json({ error: "عملية غير معروفة" }, 400);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
