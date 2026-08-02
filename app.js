@@ -735,6 +735,12 @@ function renderMoveBody(mode) {
       if (!wasCritical && nowCritical && state.settings.resend_api_key) {
         const recipients = (state.settings.notify_emails || "").split(",").map(e => e.trim()).filter(Boolean);
         if (recipients.length) {
+          console.log("EMAIL ALERT TEST", {
+  key: !!state.settings.resend_api_key,
+  emails: state.settings.notify_emails,
+  wasCritical,
+  nowCritical
+});
           callEmailService({
             action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
             itemName: sel.name, qty: newQty, maxQty: sel.max_qty, unit: sel.unit,
@@ -1150,7 +1156,7 @@ function renderSettings(main) {
 if (resendKey) {
   statusEl.style.color = "var(--green)";
   statusEl.textContent = "✓ تم حفظ مفتاح Resend";
-}
+}لهف
 
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
