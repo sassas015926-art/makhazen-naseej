@@ -727,23 +727,6 @@ function renderMoveBody(mode) {
       qtyBefore: sel.qty, qtyAfter: newQty,
       details: worker ? `بمعرفة: ${worker}${note ? " — " + note : ""}` : (note || null),
     });
-    // إشعار تلقائي بالإيميل عند وصول الصنف لأول مرة للمستوى الحرج بسبب عملية سحب
-    // (بيتبعت مرة واحدة وقت العبور للحالة الحرجة، مش مع كل عملية سحب بعد كده لتجنّب الإغراق بالإيميلات)
-    if (!isIn) {
-      const wasCritical = statusOf(sel) === "critical";
-      const nowCritical = statusOf({ ...sel, qty: newQty }) === "critical";
-      if (!wasCritical && nowCritical && state.settings.resend_api_key) {
-        const recipients = (state.settings.notify_emails || "").split(",").map(e => e.trim()).filter(Boolean);
-        if (recipients.length) {
-          callEmailService({
-            action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
-            itemName: sel.name, qty: newQty, maxQty: sel.max_qty, unit: sel.unit,
-            pct: sel.max_qty ? (newQty / sel.max_qty) * 100 : 0,
-          }).then(res => { if (res.error || res.success === false) console.warn("تعذر إرسال تنبيه المخزون الحرج بالإيميل:", res.reason || res.error); })
-            .catch(() => {});
-        }
-      }
-    }
     toast(isIn ? `تم إدخال ${qty} ${sel.unit} إلى "${sel.name}"` : `تم سحب ${qty} ${sel.unit} من "${sel.name}"`);
     state.selectedItem = null;
     await Promise.all([loadItems(), loadTransactions()]);
