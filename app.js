@@ -727,27 +727,21 @@ function renderMoveBody(mode) {
       qtyBefore: sel.qty, qtyAfter: newQty,
       details: worker ? `بمعرفة: ${worker}${note ? " — " + note : ""}` : (note || null),
     });
-    // إشعار تلقائي بالإيميل عند وصول الصنف لأول مرة للمستوى الحرج بسبب عملية سحب
-    // (بيتبعت مرة واحدة وقت العبور للحالة الحرجة، مش مع كل عملية سحب بعد كده لتجنّب الإغراق بالإيميلات)
+    // إشعارات تلقائية عند عبور الصنف لحالة أسوأ بسبب عملية سحب (مرة واحدة بس وقت العبور،
+    // مش مع كل عملية سحب بعد كده لتجنّب الإغراق بالإشعارات) — عبر Email و Telegram معًا،
+    // كل قناة مستقلة عن التانية (لو Telegram معطّل أو مش متظبط، الإيميل يفضل يشتغل والعكس)
     if (!isIn) {
+      // منطق الحالة الحرجة الأصلي — لم يتغيّر
       const wasCritical = statusOf(sel) === "critical";
       const nowCritical = statusOf({ ...sel, qty: newQty }) === "critical";
-      if (!wasCritical && nowCritical && state.settings.resend_api_key) {
-        const recipients = (state.settings.notify_emails || "").split(",").map(e => e.trim()).filter(Boolean);
-        if (recipients.length) {
-          console.log("EMAIL ALERT TEST", {
-  key: !!state.settings.resend_api_key,
-  emails: state.settings.notify_emails,
-  wasCritical,
-  nowCritical
-});
-          callEmailService({
-            action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
-            itemName: sel.name, qty: newQty, maxQty: sel.max_qty, unit: sel.unit,
-            pct: sel.max_qty ? (newQty / sel.max_qty) * 100 : 0,
-          }).then(res => { if (res.error || res.success === false) console.warn("تعذر إرسال تنبيه المخزون الحرج بالإيميل:", res.reason || res.error); })
-            .catch(() => {});
-        }
+      if (!wasCritical && nowCritical) {
+        notifyStockAlert(sel.name, newQty, sel.max_qty, sel.unit, sel.max_qty ? (newQty / sel.max_qty) * 100 : 0, "critical");
+      }
+      // تنبيه المخزون المنخفض الجديد: بس أول ما الصنف يعدّي من "جيد" لـ"منخفض"
+      const wasLow = statusOf(sel) !== "ok";
+      const nowLow = statusOf({ ...sel, qty: newQty }) === "warning";
+      if (!wasLow && nowLow) {
+        notifyStockAlert(sel.name, newQty, sel.max_qty, sel.unit, sel.max_qty ? (newQty / sel.max_qty) * 100 : 0, "low");
       }
     }
     toast(isIn ? `تم إدخال ${qty} ${sel.unit} إلى "${sel.name}"` : `تم سحب ${qty} ${sel.unit} من "${sel.name}"`);
@@ -1110,7 +1104,28 @@ function renderSettings(main) {
       </div>
       <div style="display:flex; gap:10px;">
         <div class="field" style="flex:1;"><label>توكن بوت تليجرام</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
-        <div class="field" style="flex:1;"><label>Chat ID تليجرام</label><input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789"></div>
+        <div class="field" style="flex:1;">
+          <label>Chat ID تليجرام</label>
+          <div style="display:flex; gap:6px;">
+            <input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789">
+            <button class="icon-btn" id="ws-tg-getchat" type="button" title="الحصول على Chat ID تلقائيًا" style="flex-shrink:0; width:auto; padding:0 10px;">${icon("search", 13)}</button>
+          </div>
+        </div>
+      </div>
+      <div id="tg-key-status" style="font-size:11.5px; margin:-6px 0 8px; min-height:16px;"></div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
+        <label>اختبار إرسال رسالة Telegram حقيقية</label>
+        <div style="margin-top:6px;">
+          <button class="btn-dark" id="ws-test-telegram" type="button">${icon("alert", 14)} إرسال رسالة اختبار Telegram</button>
+        </div>
+        <div id="test-telegram-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+      </div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <label style="margin-bottom:2px;">تقرير المخزن اليومي</label>
+          <div style="font-size:11.5px; color:var(--ink70);">لو مفعّل، هيتبعت تلقائيًا كل يوم الساعة ${state.settings.daily_report_time || "16:00"} (بتوقيت اسطنبول) عبر الإيميل وTelegram المتظبطين فوق</div>
+        </div>
+        <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? "✓ مفعّل (ON)" : "متوقف (OFF)"}</button>
       </div>
       <button class="btn-primary" id="ws-save-notify">حفظ إعدادات الإشعارات</button>
     </div>
@@ -1149,20 +1164,56 @@ function renderSettings(main) {
   $("#ws-save-notify").onclick = async () => {
     const saveBtn = $("#ws-save-notify");
     const statusEl = $("#resend-key-status");
+    const tgStatusEl = $("#tg-key-status");
     const resendKey = $("#ws-resend").value.trim();
+    const tgToken = $("#ws-tg-token").value.trim();
+    const tgChat = $("#ws-tg-chat").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
+    tgStatusEl.textContent = ""; tgStatusEl.style.color = "";
 
-   // مفتاح Resend يتم التحقق منه عبر إرسال الاختبار، لذلك نحفظه مباشرة
-if (resendKey) {
-  statusEl.style.color = "var(--green)";
-  statusEl.textContent = "✓ تم حفظ مفتاح Resend";
-}لهف
+    // لا نسمح بحفظ مفتاح Resend غير صحيح — نتحقق منه فعليًا مع Resend قبل أي حفظ
+    if (resendKey) {
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من مفتاح Resend...";
+      const check = await callEmailService({ action: "validate", apiKey: resendKey });
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
+      if (check.error || !check.valid) {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || "مفتاح Resend غير صحيح") : check.error);
+        toast("لم يتم الحفظ — مفتاح Resend غير صحيح", true);
+        return; // إيقاف الحفظ تمامًا — مفيش حفظ لمفتاح غلط
+      }
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = "✓ تم التحقق من المفتاح بنجاح";
+    }
+
+    // نفس أسلوب التحقق بالظبط لكن لـ Telegram Bot Token — لازم يكون التوكن والـ Chat ID
+    // موجودين مع بعض أو فاضيين مع بعض (مش هينفع توكن من غير Chat ID أو العكس)
+    if (tgToken || tgChat) {
+      if (!tgToken || !tgChat) {
+        tgStatusEl.style.color = "var(--red)";
+        tgStatusEl.textContent = "✗ لازم تكتب توكن البوت وChat ID مع بعض";
+        toast("لم يتم الحفظ — بيانات Telegram ناقصة", true);
+        return;
+      }
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من Telegram...";
+      const tgCheck = await callTelegramService({ action: "validate", token: tgToken });
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
+      if (tgCheck.error || !tgCheck.valid) {
+        tgStatusEl.style.color = "var(--red)";
+        tgStatusEl.textContent = "✗ " + (tgCheck.valid === false ? (tgCheck.reason || "مفتاح Telegram Bot غير صحيح") : tgCheck.error);
+        toast("لم يتم الحفظ — مفتاح Telegram Bot غير صحيح", true);
+        return; // إيقاف الحفظ تمامًا — مفيش حفظ لتوكن غلط
+      }
+      tgStatusEl.style.color = "var(--green)";
+      tgStatusEl.textContent = `✓ تم التحقق من البوت بنجاح${tgCheck.botUsername ? " (@" + tgCheck.botUsername + ")" : ""}`;
+    }
 
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
       resend_api_key: resendKey,
-      telegram_bot_token: $("#ws-tg-token").value.trim(),
-      telegram_chat_id: $("#ws-tg-chat").value.trim(),
+      telegram_bot_token: tgToken,
+      telegram_chat_id: tgChat,
+      daily_report_enabled: $("#ws-daily-report-toggle").dataset.on === "1",
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
@@ -1170,6 +1221,56 @@ if (resendKey) {
     await loadSettings();
     logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
     toast("تم حفظ إعدادات الإشعارات");
+  };
+
+  $("#ws-daily-report-toggle").onclick = () => {
+    const btn = $("#ws-daily-report-toggle");
+    const isOn = btn.dataset.on === "1";
+    btn.dataset.on = isOn ? "0" : "1";
+    btn.classList.toggle("active-lang", !isOn);
+    btn.textContent = !isOn ? "✓ مفعّل (ON)" : "متوقف (OFF)";
+  };
+
+  $("#ws-tg-getchat").onclick = async () => {
+    const tgToken = $("#ws-tg-token").value.trim();
+    const statusEl = $("#tg-key-status");
+    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب توكن البوت الأول"; return; }
+    statusEl.style.color = "var(--ink70)";
+    statusEl.textContent = "افتح Telegram وابحث عن البوت، اضغط Start وابعتله أي رسالة، وبعدين ارجع دوس هنا تاني...";
+    const res = await callTelegramService({ action: "getChatId", token: tgToken });
+    if (res.error || !res.found) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ " + (res.reason || res.error || "لم يتم العثور على Chat ID. أرسل رسالة للبوت أولاً ثم حاول مرة أخرى.");
+      return;
+    }
+    $("#ws-tg-chat").value = res.chatId;
+    statusEl.style.color = "var(--green)";
+    statusEl.textContent = `✓ تم العثور على Chat ID${res.chatTitle ? " (" + res.chatTitle + ")" : ""} وتعبئته تلقائيًا`;
+  };
+
+  $("#ws-test-telegram").onclick = async () => {
+    const testBtn = $("#ws-test-telegram");
+    const statusEl = $("#test-telegram-status");
+    const tgToken = $("#ws-tg-token").value.trim();
+    const tgChat = $("#ws-tg-chat").value.trim();
+    statusEl.textContent = ""; statusEl.style.color = "";
+
+    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب توكن البوت الأول"; return; }
+    if (!tgChat) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب Chat ID الأول (أو استخدم زر الحصول عليه تلقائيًا)"; return; }
+
+    testBtn.disabled = true; testBtn.textContent = "جاري الإرسال...";
+    const res = await callTelegramService({ action: "sendTest", token: tgToken, chatId: tgChat });
+    testBtn.disabled = false; testBtn.textContent = "إرسال رسالة اختبار Telegram";
+
+    if (res.error || res.success === false) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ " + (res.reason || res.error || "فشل الإرسال");
+      toast("فشل إرسال رسالة Telegram", true);
+    } else {
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = "✓ تم إرسال رسالة Telegram بنجاح";
+      toast("تم إرسال رسالة Telegram بنجاح");
+    }
   };
 
   $("#ws-test-email").onclick = async () => {
@@ -1774,7 +1875,49 @@ async function callManageUsers(payload) {
   }
 }
 
-/* ---------------- استدعاء Edge Function الخاصة بخدمة البريد الإلكتروني (Resend) ---------------- */
+/* ---------------- استدعاء Edge Function الخاصة بـ Telegram ---------------- */
+async function callTelegramService(payload) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/telegram-service`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || "حدث خطأ غير متوقع" };
+    return json;
+  } catch (e) {
+    return { error: "تعذر الاتصال بخدمة Telegram — تأكد إن الـ Edge Function \"telegram-service\" متنشرة على Supabase" };
+  }
+}
+
+/* ---------------- طبقة إشعارات مشتركة: Email + Telegram معًا ----------------
+   كل قناة مستقلة تمامًا عن التانية: فشل Telegram ميوقفش الإيميل، والعكس. */
+async function notifyStockAlert(itemName, qty, maxQty, unit, pct, level) {
+  const results = { email: null, telegram: null };
+  if (state.settings.resend_api_key) {
+    const recipients = (state.settings.notify_emails || "").split(",").map(e => e.trim()).filter(Boolean);
+    if (recipients.length) {
+      try {
+        results.email = await callEmailService({
+          action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
+          itemName, qty, maxQty, unit, pct, level,
+        });
+      } catch (e) { results.email = { error: String(e) }; }
+      if (results.email?.error || results.email?.success === false) console.warn("تعذر إرسال تنبيه المخزون بالإيميل:", results.email.reason || results.email.error);
+    }
+  }
+  if (state.settings.telegram_bot_token && state.settings.telegram_chat_id) {
+    const isCritical = level === "critical";
+    const text = `${isCritical ? "🚨" : "⚠️"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}\n\nالصنف:\n${itemName}\n\nالكمية الحالية:\n${qty} ${unit || ""}\n\nالحد الأقصى:\n${maxQty} ${unit || ""}\n\nالنسبة:\n${Math.round(pct)}%`;
+    try {
+      results.telegram = await callTelegramService({ action: "sendAlert", token: state.settings.telegram_bot_token, chatId: state.settings.telegram_chat_id, text });
+    } catch (e) { results.telegram = { error: String(e) }; }
+    if (results.telegram?.error || results.telegram?.success === false) console.warn("تعذر إرسال تنبيه المخزون بتيليجرام:", results.telegram.reason || results.telegram.error);
+  }
+  return results;
+}
 async function callEmailService(payload) {
   try {
     const { data: { session } } = await sb.auth.getSession();
