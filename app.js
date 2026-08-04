@@ -25,9 +25,38 @@ const ICONS = {
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  truck: '<path d="M1 3h13v13H1z"/><path d="M14 8h4l4 4v4h-8V8z"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/>',
+  tag: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.59a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
 };
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
+}
+
+/* ---------------- تحميل المكتبات الثقيلة عند الحاجة فقط (يقلل وقت فتح البرنامج) ---------------- */
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "1") return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("تعذر تحميل المكتبة: " + src)));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => { s.dataset.loaded = "1"; resolve(); };
+    s.onerror = () => reject(new Error("تعذر تحميل المكتبة: " + src));
+    document.head.appendChild(s);
+  });
+}
+function ensureXLSX() {
+  if (typeof XLSX !== "undefined") return Promise.resolve();
+  return loadScriptOnce("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
+}
+function ensureBarcodeLib() {
+  if (typeof JsBarcode !== "undefined") return Promise.resolve();
+  return loadScriptOnce("https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js");
 }
 
 const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "بطانات", "إكسسوارات", "أخرى"];
@@ -377,14 +406,20 @@ function applyBranding() {
   sideLogo.innerHTML = logo ? `<img src="${logo}">` : icon("scissors", 19);
 }
 
+function hideBootLoader() {
+  const el = document.getElementById("boot-loader");
+  if (el) { el.classList.add("boot-loader-hidden"); setTimeout(() => el.remove(), 300); }
+}
 function showLogin() {
   $("#login-screen").classList.remove("hidden");
   $("#app-shell").classList.add("hidden");
   $("#login-error").classList.add("hidden");
+  hideBootLoader();
 }
 function showApp() {
   $("#login-screen").classList.add("hidden");
   $("#app-shell").classList.remove("hidden");
+  hideBootLoader();
   applyBranding();
   const wname = state.profile?.full_name || state.user.email.split("@")[0];
   $("#who-name").textContent = wname;
@@ -408,9 +443,9 @@ const NAV = [
   { id: "stock", labelKey: "navStock", icon: "package" },
   { id: "reports", labelKey: "navReports", icon: "chart" },
   { id: "audit", labelKey: "navAudit", icon: "history" },
-  { id: "items", labelKey: "navItems", icon: "package" },
-  { id: "suppliers", labelKey: "navSuppliers", icon: "package" },
-  { id: "users", labelKey: "navUsers", icon: "gear" },
+  { id: "items", labelKey: "navItems", icon: "tag" },
+  { id: "suppliers", labelKey: "navSuppliers", icon: "truck" },
+  { id: "users", labelKey: "navUsers", icon: "users" },
   { id: "settings", labelKey: "navSettings", icon: "gear" },
 ];
 function renderNav() {
@@ -727,53 +762,21 @@ function renderMoveBody(mode) {
       qtyBefore: sel.qty, qtyAfter: newQty,
       details: worker ? `بمعرفة: ${worker}${note ? " — " + note : ""}` : (note || null),
     });
-    // إشعار تلقائي بالإيميل عند وصول الصنف لأول مرة للمستوى الحرج بسبب عملية سحب
-    // (بيتبعت مرة واحدة وقت العبور للحالة الحرجة، مش مع كل عملية سحب بعد كده لتجنّب الإغراق بالإيميلات)
+    // إشعارات تلقائية عند عبور الصنف لحالة أسوأ بسبب عملية سحب (مرة واحدة بس وقت العبور،
+    // مش مع كل عملية سحب بعد كده لتجنّب الإغراق بالإشعارات) — عبر Email و Telegram معًا،
+    // كل قناة مستقلة عن التانية (لو Telegram معطّل أو مش متظبط، الإيميل يفضل يشتغل والعكس)
     if (!isIn) {
+      // منطق الحالة الحرجة الأصلي — لم يتغيّر
       const wasCritical = statusOf(sel) === "critical";
       const nowCritical = statusOf({ ...sel, qty: newQty }) === "critical";
       if (!wasCritical && nowCritical) {
-
-    console.log("دخل شرط التنبيه الحرج");
-
-    notifyStockAlert(
-        sel.name,
-        newQty,
-        sel.max_qty,
-        sel.unit,
-        sel.max_qty ? (newQty / sel.max_qty) * 100 : 0,
-        "critical"
-    );
-}
-const wasWarning = statusOf(sel) === "warning";
-const nowWarning = statusOf({ ...sel, qty: newQty }) === "warning";
-
-if (statusOf(sel) === "ok" && nowWarning) {
-    console.log("دخل شرط التنبيه المنخفض");
-
-    notifyStockAlert(
-        sel.name,
-        newQty,
-        sel.max_qty,
-        sel.unit,
-        sel.max_qty ? (newQty / sel.max_qty) * 100 : 0,
-        "low"
-    );
-}
-        if (recipients.length) {
-          console.log("EMAIL ALERT TEST", {
-  key: !!state.settings.resend_api_key,
-  emails: state.settings.notify_emails,
-  wasCritical,
-  nowCritical
-});
-          callEmailService({
-            action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
-            itemName: sel.name, qty: newQty, maxQty: sel.max_qty, unit: sel.unit,
-            pct: sel.max_qty ? (newQty / sel.max_qty) * 100 : 0,
-          }).then(res => { if (res.error || res.success === false) console.warn("تعذر إرسال تنبيه المخزون الحرج بالإيميل:", res.reason || res.error); })
-            .catch(() => {});
-        }
+        notifyStockAlert(sel.name, newQty, sel.max_qty, sel.unit, sel.max_qty ? (newQty / sel.max_qty) * 100 : 0, "critical");
+      }
+      // تنبيه المخزون المنخفض الجديد: بس أول ما الصنف يعدّي من "جيد" لـ"منخفض"
+      const wasLow = statusOf(sel) !== "ok";
+      const nowLow = statusOf({ ...sel, qty: newQty }) === "warning";
+      if (!wasLow && nowLow) {
+        notifyStockAlert(sel.name, newQty, sel.max_qty, sel.unit, sel.max_qty ? (newQty / sel.max_qty) * 100 : 0, "low");
       }
     }
     toast(isIn ? `تم إدخال ${qty} ${sel.unit} إلى "${sel.name}"` : `تم سحب ${qty} ${sel.unit} من "${sel.name}"`);
@@ -782,7 +785,7 @@ if (statusOf(sel) === "ok" && nowWarning) {
     render();
   };
 }
-notifyStockAlert
+
 /* ---------------- stock table ---------------- */
 function renderStock(main) {
   const collapsedCats = new Set();
@@ -927,7 +930,7 @@ function renderReports(main) {
     if (allEl && boxes.length) allEl.checked = boxes.every(b => b.checked);
   };
 
-  let lowStock = [], cons = [];
+  let lowStock = [], cons = [], dailyRows = [];
   const refreshScopedLists = () => {
     const allowed = getAllowedCats();
     const passCat = (c) => !allowed || allowed.has(c);
@@ -940,7 +943,7 @@ function renderReports(main) {
       if (tx.type === "in") { dailyMap[day].inCount++; dailyMap[day].inQty += Number(tx.qty); }
       else { dailyMap[day].outCount++; dailyMap[day].outQty += Number(tx.qty); }
     });
-    const dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
+    dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
     $("#daily-body").innerHTML = dailyRows.length ? dailyRows.map(([day, d]) => `
       <tr><td style="font-weight:700;" class="mono">${day}</td><td class="mono">${d.inCount}</td><td class="mono" style="color:var(--green);">+${d.inQty}</td>
       <td class="mono">${d.outCount}</td><td class="mono" style="color:var(--red);">-${d.outQty}</td></tr>`).join("")
@@ -1042,7 +1045,11 @@ function renderReports(main) {
   };
   window.addEventListener("afterprint", () => $$(".print-exclude").forEach(el => el.classList.remove("print-exclude")), { once: true });
 
-  $("#export-excel").onclick = () => {
+  $("#export-excel").onclick = async () => {
+   const exportBtn = $("#export-excel"); const exportBtnOrigText = exportBtn.innerHTML;
+   try {
+    exportBtn.disabled = true; exportBtn.innerHTML = "...جارِ التجهيز";
+    await ensureXLSX();
     const genTime2 = fmtDate(new Date().toISOString());
     const wb = XLSX.utils.book_new();
 
@@ -1087,6 +1094,12 @@ function renderReports(main) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ "المصنع": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]), "معلومات التقرير");
 
     XLSX.writeFile(wb, `تقرير_المخزون_${new Date().toISOString().slice(0, 10)}.xlsx`);
+   } catch (e) {
+    console.error("export-excel error:", e);
+    toast("حدث خطأ أثناء تصدير Excel — " + (e && e.message ? e.message : ""), true);
+   } finally {
+    exportBtn.disabled = false; exportBtn.innerHTML = exportBtnOrigText;
+   }
   };
 }
 
@@ -1136,7 +1149,28 @@ function renderSettings(main) {
       </div>
       <div style="display:flex; gap:10px;">
         <div class="field" style="flex:1;"><label>توكن بوت تليجرام</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
-        <div class="field" style="flex:1;"><label>Chat ID تليجرام</label><input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789"></div>
+        <div class="field" style="flex:1;">
+          <label>Chat ID تليجرام</label>
+          <div style="display:flex; gap:6px;">
+            <input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789">
+            <button class="icon-btn" id="ws-tg-getchat" type="button" title="الحصول على Chat ID تلقائيًا" style="flex-shrink:0; width:auto; padding:0 10px;">${icon("search", 13)}</button>
+          </div>
+        </div>
+      </div>
+      <div id="tg-key-status" style="font-size:11.5px; margin:-6px 0 8px; min-height:16px;"></div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
+        <label>اختبار إرسال رسالة Telegram حقيقية</label>
+        <div style="margin-top:6px;">
+          <button class="btn-dark" id="ws-test-telegram" type="button">${icon("alert", 14)} إرسال رسالة اختبار Telegram</button>
+        </div>
+        <div id="test-telegram-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+      </div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div>
+          <label style="margin-bottom:2px;">تقرير المخزن اليومي</label>
+          <div style="font-size:11.5px; color:var(--ink70);">لو مفعّل، هيتبعت تلقائيًا كل يوم الساعة ${state.settings.daily_report_time || "16:00"} (بتوقيت اسطنبول) عبر الإيميل وTelegram المتظبطين فوق</div>
+        </div>
+        <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? "✓ مفعّل (ON)" : "متوقف (OFF)"}</button>
       </div>
       <button class="btn-primary" id="ws-save-notify">حفظ إعدادات الإشعارات</button>
     </div>
@@ -1175,20 +1209,56 @@ function renderSettings(main) {
   $("#ws-save-notify").onclick = async () => {
     const saveBtn = $("#ws-save-notify");
     const statusEl = $("#resend-key-status");
+    const tgStatusEl = $("#tg-key-status");
     const resendKey = $("#ws-resend").value.trim();
+    const tgToken = $("#ws-tg-token").value.trim();
+    const tgChat = $("#ws-tg-chat").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
+    tgStatusEl.textContent = ""; tgStatusEl.style.color = "";
 
-   // مفتاح Resend يتم التحقق منه عبر إرسال الاختبار، لذلك نحفظه مباشرة
-if (resendKey) {
-  statusEl.style.color = "var(--green)";
-  statusEl.textContent = "✓ تم حفظ مفتاح Resend";
-}لهف
+    // لا نسمح بحفظ مفتاح Resend غير صحيح — نتحقق منه فعليًا مع Resend قبل أي حفظ
+    if (resendKey) {
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من مفتاح Resend...";
+      const check = await callEmailService({ action: "validate", apiKey: resendKey });
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
+      if (check.error || !check.valid) {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || "مفتاح Resend غير صحيح") : check.error);
+        toast("لم يتم الحفظ — مفتاح Resend غير صحيح", true);
+        return; // إيقاف الحفظ تمامًا — مفيش حفظ لمفتاح غلط
+      }
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = "✓ تم التحقق من المفتاح بنجاح";
+    }
+
+    // نفس أسلوب التحقق بالظبط لكن لـ Telegram Bot Token — لازم يكون التوكن والـ Chat ID
+    // موجودين مع بعض أو فاضيين مع بعض (مش هينفع توكن من غير Chat ID أو العكس)
+    if (tgToken || tgChat) {
+      if (!tgToken || !tgChat) {
+        tgStatusEl.style.color = "var(--red)";
+        tgStatusEl.textContent = "✗ لازم تكتب توكن البوت وChat ID مع بعض";
+        toast("لم يتم الحفظ — بيانات Telegram ناقصة", true);
+        return;
+      }
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من Telegram...";
+      const tgCheck = await callTelegramService({ action: "validate", token: tgToken });
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
+      if (tgCheck.error || !tgCheck.valid) {
+        tgStatusEl.style.color = "var(--red)";
+        tgStatusEl.textContent = "✗ " + (tgCheck.valid === false ? (tgCheck.reason || "مفتاح Telegram Bot غير صحيح") : tgCheck.error);
+        toast("لم يتم الحفظ — مفتاح Telegram Bot غير صحيح", true);
+        return; // إيقاف الحفظ تمامًا — مفيش حفظ لتوكن غلط
+      }
+      tgStatusEl.style.color = "var(--green)";
+      tgStatusEl.textContent = `✓ تم التحقق من البوت بنجاح${tgCheck.botUsername ? " (@" + tgCheck.botUsername + ")" : ""}`;
+    }
 
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
       resend_api_key: resendKey,
-      telegram_bot_token: $("#ws-tg-token").value.trim(),
-      telegram_chat_id: $("#ws-tg-chat").value.trim(),
+      telegram_bot_token: tgToken,
+      telegram_chat_id: tgChat,
+      daily_report_enabled: $("#ws-daily-report-toggle").dataset.on === "1",
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
@@ -1196,6 +1266,56 @@ if (resendKey) {
     await loadSettings();
     logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
     toast("تم حفظ إعدادات الإشعارات");
+  };
+
+  $("#ws-daily-report-toggle").onclick = () => {
+    const btn = $("#ws-daily-report-toggle");
+    const isOn = btn.dataset.on === "1";
+    btn.dataset.on = isOn ? "0" : "1";
+    btn.classList.toggle("active-lang", !isOn);
+    btn.textContent = !isOn ? "✓ مفعّل (ON)" : "متوقف (OFF)";
+  };
+
+  $("#ws-tg-getchat").onclick = async () => {
+    const tgToken = $("#ws-tg-token").value.trim();
+    const statusEl = $("#tg-key-status");
+    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب توكن البوت الأول"; return; }
+    statusEl.style.color = "var(--ink70)";
+    statusEl.textContent = "افتح Telegram وابحث عن البوت، اضغط Start وابعتله أي رسالة، وبعدين ارجع دوس هنا تاني...";
+    const res = await callTelegramService({ action: "getChatId", token: tgToken });
+    if (res.error || !res.found) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ " + (res.reason || res.error || "لم يتم العثور على Chat ID. أرسل رسالة للبوت أولاً ثم حاول مرة أخرى.");
+      return;
+    }
+    $("#ws-tg-chat").value = res.chatId;
+    statusEl.style.color = "var(--green)";
+    statusEl.textContent = `✓ تم العثور على Chat ID${res.chatTitle ? " (" + res.chatTitle + ")" : ""} وتعبئته تلقائيًا`;
+  };
+
+  $("#ws-test-telegram").onclick = async () => {
+    const testBtn = $("#ws-test-telegram");
+    const statusEl = $("#test-telegram-status");
+    const tgToken = $("#ws-tg-token").value.trim();
+    const tgChat = $("#ws-tg-chat").value.trim();
+    statusEl.textContent = ""; statusEl.style.color = "";
+
+    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب توكن البوت الأول"; return; }
+    if (!tgChat) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب Chat ID الأول (أو استخدم زر الحصول عليه تلقائيًا)"; return; }
+
+    testBtn.disabled = true; testBtn.textContent = "جاري الإرسال...";
+    const res = await callTelegramService({ action: "sendTest", token: tgToken, chatId: tgChat });
+    testBtn.disabled = false; testBtn.textContent = "إرسال رسالة اختبار Telegram";
+
+    if (res.error || res.success === false) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ " + (res.reason || res.error || "فشل الإرسال");
+      toast("فشل إرسال رسالة Telegram", true);
+    } else {
+      statusEl.style.color = "var(--green)";
+      statusEl.textContent = "✓ تم إرسال رسالة Telegram بنجاح";
+      toast("تم إرسال رسالة Telegram بنجاح");
+    }
   };
 
   $("#ws-test-email").onclick = async () => {
@@ -1408,7 +1528,13 @@ async function renderItemsAdmin(main) {
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th>${t("itemSupplier")}</th><th>${t("itemStorage")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
-  $("#download-template").onclick = () => {
+  $("#download-template").onclick = async () => {
+    const dtBtn = $("#download-template"); const dtOrigText = dtBtn.innerHTML;
+    try {
+      dtBtn.disabled = true; dtBtn.innerHTML = "...جارِ التجهيز";
+      await ensureXLSX();
+    } catch (e) { toast("تعذر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت", true); dtBtn.disabled = false; dtBtn.innerHTML = dtOrigText; return; }
+    dtBtn.disabled = false; dtBtn.innerHTML = dtOrigText;
     const wb = XLSX.utils.book_new();
 
     const instructions = [
@@ -1436,6 +1562,7 @@ async function renderItemsAdmin(main) {
     const statusEl = $("#import-status");
     statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ قراءة الملف</span>`;
     try {
+      await ensureXLSX();
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       // نقرأ شيت "أصناف" بالاسم لو موجود (ملف القالب فيه شيت تعليمات كمان)، وإلا أول شيت في الملف للتوافق مع ملفات قديمة
@@ -1800,7 +1927,49 @@ async function callManageUsers(payload) {
   }
 }
 
-/* ---------------- استدعاء Edge Function الخاصة بخدمة البريد الإلكتروني (Resend) ---------------- */
+/* ---------------- استدعاء Edge Function الخاصة بـ Telegram ---------------- */
+async function callTelegramService(payload) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/telegram-service`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || "حدث خطأ غير متوقع" };
+    return json;
+  } catch (e) {
+    return { error: "تعذر الاتصال بخدمة Telegram — تأكد إن الـ Edge Function \"telegram-service\" متنشرة على Supabase" };
+  }
+}
+
+/* ---------------- طبقة إشعارات مشتركة: Email + Telegram معًا ----------------
+   كل قناة مستقلة تمامًا عن التانية: فشل Telegram ميوقفش الإيميل، والعكس. */
+async function notifyStockAlert(itemName, qty, maxQty, unit, pct, level) {
+  const results = { email: null, telegram: null };
+  if (state.settings.resend_api_key) {
+    const recipients = (state.settings.notify_emails || "").split(",").map(e => e.trim()).filter(Boolean);
+    if (recipients.length) {
+      try {
+        results.email = await callEmailService({
+          action: "sendLowStockAlert", apiKey: state.settings.resend_api_key, to: recipients,
+          itemName, qty, maxQty, unit, pct, level,
+        });
+      } catch (e) { results.email = { error: String(e) }; }
+      if (results.email?.error || results.email?.success === false) console.warn("تعذر إرسال تنبيه المخزون بالإيميل:", results.email.reason || results.email.error);
+    }
+  }
+  if (state.settings.telegram_bot_token && state.settings.telegram_chat_id) {
+    const isCritical = level === "critical";
+    const text = `${isCritical ? "🚨" : "⚠️"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}\n\nالصنف:\n${itemName}\n\nالكمية الحالية:\n${qty} ${unit || ""}\n\nالحد الأقصى:\n${maxQty} ${unit || ""}\n\nالنسبة:\n${Math.round(pct)}%`;
+    try {
+      results.telegram = await callTelegramService({ action: "sendAlert", token: state.settings.telegram_bot_token, chatId: state.settings.telegram_chat_id, text });
+    } catch (e) { results.telegram = { error: String(e) }; }
+    if (results.telegram?.error || results.telegram?.success === false) console.warn("تعذر إرسال تنبيه المخزون بتيليجرام:", results.telegram.reason || results.telegram.error);
+  }
+  return results;
+}
 async function callEmailService(payload) {
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -1967,7 +2136,12 @@ function openItemModal(existing, prefillName, onDone) {
   const drawBarcode = () => {
     const val = $("#f-barcode", overlay).value.trim();
     const prev = $("#barcode-preview", overlay);
-    if (!val || typeof JsBarcode === "undefined") { prev.innerHTML = ""; return; }
+    if (!val) { prev.innerHTML = ""; return; }
+    if (typeof JsBarcode === "undefined") {
+      prev.innerHTML = `<span style="font-size:11px; color:var(--ink50);">...جارِ تحميل مكتبة الباركود</span>`;
+      ensureBarcodeLib().then(() => { if ($("#f-barcode", overlay) && $("#f-barcode", overlay).value.trim() === val) drawBarcode(); }).catch(() => { prev.innerHTML = ""; });
+      return;
+    }
     prev.innerHTML = `<svg id="bc-svg"></svg>`;
     try { JsBarcode("#bc-svg", val, { height: 40, fontSize: 12, margin: 4 }); } catch (e) { prev.innerHTML = `<span style="font-size:11px; color:var(--ink50);">قيمة غير صالحة للباركود</span>`; }
   };
@@ -2316,5 +2490,5 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#about-btn").addEventListener("click", openAboutModal);
   $("#help-btn-mobile").addEventListener("click", openHelpModal);
   $("#about-btn-mobile").addEventListener("click", openAboutModal);
-  boot();
+  boot().catch((e) => { console.error("boot() error:", e); hideBootLoader(); showLogin(); });
 });
