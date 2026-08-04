@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       return json({ found: true, chatId: String(last.message.chat.id), chatTitle: last.message.chat.first_name || last.message.chat.title || null });
     }
 
-    if (action === "sendAlert") {
+     {if (action === "sendAlert")
       const { chatId, text } = body;
       if (!chatId || !text) return json({ success: false, reason: "بيانات ناقصة" });
       const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

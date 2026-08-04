@@ -5,14 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>إدارة المخازن</title>
 <link rel="stylesheet" href="style.css">
-<!-- مكتبة Supabase (تسجيل الدخول وقاعدة البيانات) -->
+<!-- مكتبة Supabase (تسجيل الدخول وقاعدة البيانات) — ضرورية من أول لحظة، فتتحمّل فورًا -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- مكتبة تصدير ملفات Excel -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<!-- مكتبة توليد الباركود -->
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<!-- ملحوظة: مكتبتا Excel والباركود بقوا يتحمّلوا فقط لما فعليًا يُستخدموا (تصدير/استيراد/باركود) بدل كل فتحة للبرنامج، عشان يفتح أسرع -->
 </head>
 <body>
+
+  <!-- ================= شاشة التحميل الأولية (تظهر فورًا قبل أي جافاسكريبت) ================= -->
+  <div id="boot-loader">
+    <div class="boot-loader-box">
+      <div class="boot-spinner"></div>
+      <div class="boot-loader-text" id="boot-loader-text">...جارِ التحميل / Yükleniyor...</div>
+    </div>
+  </div>
 
   <!-- ================= شاشة تسجيل الدخول ================= -->
   <div id="login-screen">

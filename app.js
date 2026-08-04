@@ -25,9 +25,38 @@ const ICONS = {
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  truck: '<path d="M1 3h13v13H1z"/><path d="M14 8h4l4 4v4h-8V8z"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/>',
+  tag: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.59a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
 };
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
+}
+
+/* ---------------- تحميل المكتبات الثقيلة عند الحاجة فقط (يقلل وقت فتح البرنامج) ---------------- */
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === "1") return resolve();
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("تعذر تحميل المكتبة: " + src)));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => { s.dataset.loaded = "1"; resolve(); };
+    s.onerror = () => reject(new Error("تعذر تحميل المكتبة: " + src));
+    document.head.appendChild(s);
+  });
+}
+function ensureXLSX() {
+  if (typeof XLSX !== "undefined") return Promise.resolve();
+  return loadScriptOnce("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
+}
+function ensureBarcodeLib() {
+  if (typeof JsBarcode !== "undefined") return Promise.resolve();
+  return loadScriptOnce("https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js");
 }
 
 const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "بطانات", "إكسسوارات", "أخرى"];
@@ -377,14 +406,20 @@ function applyBranding() {
   sideLogo.innerHTML = logo ? `<img src="${logo}">` : icon("scissors", 19);
 }
 
+function hideBootLoader() {
+  const el = document.getElementById("boot-loader");
+  if (el) { el.classList.add("boot-loader-hidden"); setTimeout(() => el.remove(), 300); }
+}
 function showLogin() {
   $("#login-screen").classList.remove("hidden");
   $("#app-shell").classList.add("hidden");
   $("#login-error").classList.add("hidden");
+  hideBootLoader();
 }
 function showApp() {
   $("#login-screen").classList.add("hidden");
   $("#app-shell").classList.remove("hidden");
+  hideBootLoader();
   applyBranding();
   const wname = state.profile?.full_name || state.user.email.split("@")[0];
   $("#who-name").textContent = wname;
@@ -408,9 +443,9 @@ const NAV = [
   { id: "stock", labelKey: "navStock", icon: "package" },
   { id: "reports", labelKey: "navReports", icon: "chart" },
   { id: "audit", labelKey: "navAudit", icon: "history" },
-  { id: "items", labelKey: "navItems", icon: "package" },
-  { id: "suppliers", labelKey: "navSuppliers", icon: "package" },
-  { id: "users", labelKey: "navUsers", icon: "gear" },
+  { id: "items", labelKey: "navItems", icon: "tag" },
+  { id: "suppliers", labelKey: "navSuppliers", icon: "truck" },
+  { id: "users", labelKey: "navUsers", icon: "users" },
   { id: "settings", labelKey: "navSettings", icon: "gear" },
 ];
 function renderNav() {
@@ -895,7 +930,7 @@ function renderReports(main) {
     if (allEl && boxes.length) allEl.checked = boxes.every(b => b.checked);
   };
 
-  let lowStock = [], cons = [];
+  let lowStock = [], cons = [], dailyRows = [];
   const refreshScopedLists = () => {
     const allowed = getAllowedCats();
     const passCat = (c) => !allowed || allowed.has(c);
@@ -908,7 +943,7 @@ function renderReports(main) {
       if (tx.type === "in") { dailyMap[day].inCount++; dailyMap[day].inQty += Number(tx.qty); }
       else { dailyMap[day].outCount++; dailyMap[day].outQty += Number(tx.qty); }
     });
-    const dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
+    dailyRows = Object.entries(dailyMap).sort((a, b) => b[0].localeCompare(a[0]));
     $("#daily-body").innerHTML = dailyRows.length ? dailyRows.map(([day, d]) => `
       <tr><td style="font-weight:700;" class="mono">${day}</td><td class="mono">${d.inCount}</td><td class="mono" style="color:var(--green);">+${d.inQty}</td>
       <td class="mono">${d.outCount}</td><td class="mono" style="color:var(--red);">-${d.outQty}</td></tr>`).join("")
@@ -1010,7 +1045,11 @@ function renderReports(main) {
   };
   window.addEventListener("afterprint", () => $$(".print-exclude").forEach(el => el.classList.remove("print-exclude")), { once: true });
 
-  $("#export-excel").onclick = () => {
+  $("#export-excel").onclick = async () => {
+   const exportBtn = $("#export-excel"); const exportBtnOrigText = exportBtn.innerHTML;
+   try {
+    exportBtn.disabled = true; exportBtn.innerHTML = "...جارِ التجهيز";
+    await ensureXLSX();
     const genTime2 = fmtDate(new Date().toISOString());
     const wb = XLSX.utils.book_new();
 
@@ -1055,6 +1094,12 @@ function renderReports(main) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ "المصنع": state.settings.workshop_name || "", "تاريخ إنشاء التقرير": genTime2 }]), "معلومات التقرير");
 
     XLSX.writeFile(wb, `تقرير_المخزون_${new Date().toISOString().slice(0, 10)}.xlsx`);
+   } catch (e) {
+    console.error("export-excel error:", e);
+    toast("حدث خطأ أثناء تصدير Excel — " + (e && e.message ? e.message : ""), true);
+   } finally {
+    exportBtn.disabled = false; exportBtn.innerHTML = exportBtnOrigText;
+   }
   };
 }
 
@@ -1483,7 +1528,13 @@ async function renderItemsAdmin(main) {
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("unit")}</th><th>${t("currentQty")}</th><th>${t("maxQty")}</th><th>${t("itemSupplier")}</th><th>${t("itemStorage")}</th><th></th></tr></thead><tbody id="items-body"></tbody></table>
     </div>`;
 
-  $("#download-template").onclick = () => {
+  $("#download-template").onclick = async () => {
+    const dtBtn = $("#download-template"); const dtOrigText = dtBtn.innerHTML;
+    try {
+      dtBtn.disabled = true; dtBtn.innerHTML = "...جارِ التجهيز";
+      await ensureXLSX();
+    } catch (e) { toast("تعذر تحميل مكتبة Excel — تأكد من الاتصال بالإنترنت", true); dtBtn.disabled = false; dtBtn.innerHTML = dtOrigText; return; }
+    dtBtn.disabled = false; dtBtn.innerHTML = dtOrigText;
     const wb = XLSX.utils.book_new();
 
     const instructions = [
@@ -1511,6 +1562,7 @@ async function renderItemsAdmin(main) {
     const statusEl = $("#import-status");
     statusEl.innerHTML = `<span style="color:var(--ink70);">...جارِ قراءة الملف</span>`;
     try {
+      await ensureXLSX();
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
       // نقرأ شيت "أصناف" بالاسم لو موجود (ملف القالب فيه شيت تعليمات كمان)، وإلا أول شيت في الملف للتوافق مع ملفات قديمة
@@ -2084,7 +2136,12 @@ function openItemModal(existing, prefillName, onDone) {
   const drawBarcode = () => {
     const val = $("#f-barcode", overlay).value.trim();
     const prev = $("#barcode-preview", overlay);
-    if (!val || typeof JsBarcode === "undefined") { prev.innerHTML = ""; return; }
+    if (!val) { prev.innerHTML = ""; return; }
+    if (typeof JsBarcode === "undefined") {
+      prev.innerHTML = `<span style="font-size:11px; color:var(--ink50);">...جارِ تحميل مكتبة الباركود</span>`;
+      ensureBarcodeLib().then(() => { if ($("#f-barcode", overlay) && $("#f-barcode", overlay).value.trim() === val) drawBarcode(); }).catch(() => { prev.innerHTML = ""; });
+      return;
+    }
     prev.innerHTML = `<svg id="bc-svg"></svg>`;
     try { JsBarcode("#bc-svg", val, { height: 40, fontSize: 12, margin: 4 }); } catch (e) { prev.innerHTML = `<span style="font-size:11px; color:var(--ink50);">قيمة غير صالحة للباركود</span>`; }
   };
@@ -2433,5 +2490,5 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#about-btn").addEventListener("click", openAboutModal);
   $("#help-btn-mobile").addEventListener("click", openHelpModal);
   $("#about-btn-mobile").addEventListener("click", openAboutModal);
-  boot();
+  boot().catch((e) => { console.error("boot() error:", e); hideBootLoader(); showLogin(); });
 });

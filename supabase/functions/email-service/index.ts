@@ -158,18 +158,7 @@ if (action === "validate") {
       });
 
       const respBody: any = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        return json({
-          success: false,
-          reason:
-            respBody.message || `فشل الإرسال (كود ${r.status})`,
-        });
-      }
-
-      return json({
-        success: true,
-        id: respBody.id,
+.message
       });
     }
     if (action === "sendLowStockAlert") {
@@ -217,19 +206,4 @@ if (action === "validate") {
       }
 
       return json({
-        success: true,
-        id: respBody.id,
-      });
-    }
-    return json({ error: "عملية غير معروفة" }, 400);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-
-    return json(
-      {
-        error: "حدث خطأ غير متوقع في الخادم — " + message,
-      },
-      500
-    );
-  }
-});
+        success: true
