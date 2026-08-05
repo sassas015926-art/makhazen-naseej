@@ -389,8 +389,40 @@ async function ensureAuditLog() { if (!_auditLoaded) { await loadAuditLog(); _au
 
 /* ---------------- app boot ---------------- */
 async function boot() {
-  await loadSettingsForLogin();
-  const { data: { session } } = await sb.auth.getSession();
+  // إظهار صفحة الدخول مباشرة وعدم انتظار التحميل
+  showLogin();
+
+  try {
+    await loadSettingsForLogin();
+
+    const { data: { session } } = await sb.auth.getSession();
+
+    if (session) {
+      state.user = session.user;
+      await loadAll();
+
+      if (state.profile && state.profile.is_active === false) {
+        await sb.auth.signOut();
+        state.user = null;
+        state.profile = null;
+        showLogin();
+        $("#login-error").textContent = "هذا الحساب موقوف حاليًا. تواصل مع مدير النظام.";
+        $("#login-error").classList.remove("hidden");
+      } else {
+        showApp();
+      }
+    }
+  } catch (e) {
+    console.error("boot error:", e);
+    showLogin();
+  }
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") {
+      showLogin();
+    }
+  });
+}
   if (session) {
     state.user = session.user;
     await loadAll();
