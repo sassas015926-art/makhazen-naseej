@@ -5,7 +5,10 @@
 //   - "create"          : {email, password, fullName, role} → إنشاء حساب جديد
 //   - "delete"           : {userId}                          → حذف حساب نهائيًا
 //   - "updateUsername"   : {userId, newUsername}              → تغيير اسم المستخدم (وبالتالي الإيميل الداخلي)
-//   - "resetPassword"    : {userId}                           → توليد كلمة مرور مؤقتة وإجبار تغييرها أول دخول
+//   - "resetPassword"    : {userId, customPassword?}          → توليد كلمة مرور مؤقتة (أو استخدام
+//                                                                 customPassword لو المدير حدد كلمة مرور
+//                                                                 بنفسه بناءً على طلب المستخدم) + إجبار
+//                                                                 تغييرها أول دخول في الحالتين
 //
 // محمي بالكامل: لازم يكون الطالب مسجل دخول ودوره "admin" في جدول profiles وحسابه مفعّل.
 //
@@ -194,15 +197,23 @@ Deno.serve(async (req) => {
       return json({ success: true });
     }
 
-    // ---------------- إعادة تعيين كلمة مرور مؤقتة ----------------
+    // ---------------- إعادة تعيين كلمة مرور (تلقائية أو يحددها المدير) ----------------
     if (action === "resetPassword") {
-      const { userId } = body;
+      const { userId, customPassword } = body;
 
       if (!userId || typeof userId !== "string") {
         return json({ error: "معرف المستخدم ناقص" }, 400);
       }
 
-      const tempPassword = generateTempPassword();
+      // لو المدير حدد كلمة مرور بنفسه (اللي المستخدم طلبها)، نستخدمها بعد التحقق من طولها.
+      // غير كده، نولّد كلمة مرور مؤقتة عشوائية زي ما كان شغال.
+      let tempPassword = generateTempPassword();
+      if (customPassword !== undefined && customPassword !== null && customPassword !== "") {
+        if (typeof customPassword !== "string" || customPassword.length < 6) {
+          return json({ error: "كلمة المرور لازم تكون 6 أحرف على الأقل" }, 400);
+        }
+        tempPassword = customPassword;
+      }
 
       const { error } = await admin.auth.admin.updateUserById(userId, {
         password: tempPassword,

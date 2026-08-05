@@ -158,15 +158,34 @@ if (action === "validate") {
       });
 
       const respBody: any = await r.json().catch(() => ({}));
-.message
-      });
+
+      if (!r.ok) {
+        return json({
+          success: false,
+          reason: respBody.message || `فشل الإرسال (كود ${r.status})`,
+        });
+      }
+
+      return json({ success: true });
     }
     if (action === "sendLowStockAlert") {
-      const { to, itemName, qty, maxQty, unit, pct } = body;
+      const { to, itemName, qty, maxQty, unit, pct, level } = body;
 
       if (!Array.isArray(to) || !to.length) {
         return json({ error: "إيميلات الاستقبال ناقصة" }, 400);
       }
+
+      // شكل عنوان موحّد للرسالتين — "تنبيه مخزون منخفض/حرج - اسم الصنف".
+      // ملحوظة فنية: بروتوكول البريد الإلكتروني لا يسمح بتلوين نص العنوان (Subject) نفسه،
+      // فبنستخدم دائرة ملوّنة (🟡 للمنخفض / 🔴 للحرج) كأقرب تمييز بصري ممكن في صندوق الوارد،
+      // مع تلوين محتوى الرسالة (الجسم) فعليًا بنفس ألوان الحالة المستخدمة في النظام.
+      const isCritical = level === "critical";
+      const subject = isCritical
+        ? `🔴 تنبيه مخزون حرج - ${itemName}`
+        : `🟡 تنبيه مخزون منخفض - ${itemName}`;
+      const accentColor = isCritical ? "#C85D51" : "#B87A28";
+      const accentBg = isCritical ? "#FBEAE8" : "#FBF1E2";
+      const levelLabel = isCritical ? "المستوى الحرج" : "المستوى المنخفض";
 
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -177,11 +196,13 @@ if (action === "validate") {
         body: JSON.stringify({
           from: DEFAULT_FROM,
           to,
-          subject: `⚠️ تنبيه مخزون حرج — ${itemName}`,
+          subject,
           html: `
             <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;padding:20px;color:#122A4A;">
-              <h2>⚠️ تنبيه مخزون حرج</h2>
-              <p>وصل الصنف إلى المستوى الحرج.</p>
+              <div style="background:${accentBg};border-right:4px solid ${accentColor};padding:12px 16px;border-radius:8px;margin-bottom:16px;">
+                <h2 style="margin:0;color:${accentColor};">${isCritical ? "🔴" : "🟡"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}</h2>
+              </div>
+              <p>وصل الصنف إلى ${levelLabel}.</p>
 
               <p><b>الصنف:</b> ${itemName}</p>
               <p><b>الكمية الحالية:</b> ${qty} ${unit}</p>
@@ -206,4 +227,16 @@ if (action === "validate") {
       }
 
       return json({
-        success: true
+        success: true,
+      });
+    }
+
+    return json({ error: "عملية غير معروفة" }, 400);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return json(
+      { error: "حدث خطأ غير متوقع في الخادم — " + message },
+      500
+    );
+  }
+});

@@ -377,6 +377,8 @@ details.collapsible-card > summary:hover{background:var(--paper);}
   background:var(--card); width:100%; max-width:420px; border-radius:var(--r-lg); padding:24px;
   max-height:88vh; overflow:auto; box-shadow:var(--shadow-lg); animation:scaleIn .22s var(--ease);
 }
+.modal-box .lang-btn{background:#fff; color:var(--ink70); border:1.5px solid var(--ink12);}
+.modal-box .lang-btn.active-lang{background:var(--grad-primary); color:#fff; border-color:transparent;}
 .icon-btn{
   width:32px; height:32px; border-radius:9px; border:1.5px solid var(--ink12); background:#fff;
   display:inline-flex; align-items:center; justify-content:center; transition:all .15s ease; color:var(--ink70);
