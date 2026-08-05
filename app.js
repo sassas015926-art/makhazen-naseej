@@ -1223,12 +1223,34 @@ function renderSettings(main) {
         <button class="btn-dark" id="ws-tg-webhook-activate" type="button">${icon("send", 14)} تفعيل / تحديث Webhook</button>
         <div id="webhook-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
       </div>
-      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-        <div>
-          <label style="margin-bottom:2px;">تقرير المخزن اليومي</label>
-          <div style="font-size:11.5px; color:var(--ink70);">لو مفعّل، هيتبعت تلقائيًا كل يوم الساعة ${state.settings.daily_report_time || "16:00"} (بتوقيت اسطنبول) عبر الإيميل وTelegram المتظبطين فوق</div>
+      <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
+          <div>
+            <label style="margin-bottom:2px;">تقرير المخزن اليومي</label>
+            <div style="font-size:11.5px; color:var(--ink70);">لو مفعّل، هيتبعت تلقائيًا كل يوم عبر الإيميل وTelegram المتظبطين فوق</div>
+          </div>
+          <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? "✓ مفعّل (ON)" : "متوقف (OFF)"}</button>
         </div>
-        <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? "✓ مفعّل (ON)" : "متوقف (OFF)"}</button>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <label style="font-size:12.5px; font-weight:700; color:var(--ink70); margin:0;">موعد الإرسال اليومي (بتوقيت اسطنبول)</label>
+          <input type="time" id="ws-daily-report-time" class="input mono" style="width:120px;" value="${state.settings.daily_report_time || "16:00"}">
+        </div>
+        <div style="font-size:11.5px; color:var(--ink70); margin-bottom:10px;">
+          آخر تقرير أُرسل بنجاح: <strong>${state.settings.last_daily_report_sent_at ? new Date(state.settings.last_daily_report_sent_at).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "لم يُرسل أي تقرير بعد"}</strong>
+        </div>
+        ${(() => {
+          if (!state.settings.daily_report_enabled) return "";
+          const lastSent = state.settings.last_daily_report_sent_at;
+          const sentToday = lastSent && new Date(lastSent).toDateString() === new Date().toDateString();
+          const [th, tmn] = (state.settings.daily_report_time || "16:00").split(":").map(Number);
+          const target = new Date(); target.setHours(th, tmn + 20, 0, 0);
+          if (!sentToday && new Date() > target) {
+            return `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:8px 12px; border-radius:10px; font-size:12px; font-weight:700; margin-bottom:10px;">${icon("alert", 14)} لم يصل تقرير اليوم رغم مرور موعده — جرّب زر "إرسال تجريبي الآن" لمعرفة السبب بالتحديد</div>`;
+          }
+          return "";
+        })()}
+        <button type="button" class="btn-dark" id="ws-daily-report-test">${icon("send", 14)} إرسال تقرير تجريبي الآن</button>
+        <div id="daily-report-test-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
       </div>
       <button class="btn-primary" id="ws-save-notify">حفظ إعدادات الإشعارات</button>
     </div>
@@ -1310,6 +1332,7 @@ function renderSettings(main) {
       telegram_bot_token: tgToken,
       telegram_webhook_secret: tgWebhookSecret,
       daily_report_enabled: $("#ws-daily-report-toggle").dataset.on === "1",
+      daily_report_time: $("#ws-daily-report-time").value || "16:00",
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
@@ -1317,6 +1340,44 @@ function renderSettings(main) {
     await loadSettings();
     logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
     toast("تم حفظ إعدادات الإشعارات");
+  };
+
+  $("#ws-daily-report-test").onclick = async () => {
+    const btn = $("#ws-daily-report-test");
+    const statusEl = $("#daily-report-test-status");
+    btn.disabled = true; btn.textContent = "جارِ الإرسال...";
+    statusEl.style.color = "var(--ink70)";
+    statusEl.textContent = "جارِ الاتصال بخدمة التقرير اليومي...";
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/daily-report-service`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token || ""}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const rb = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = "✗ " + (rb.error || "فشل الاتصال بخدمة التقرير اليومي");
+        toast("فشل إرسال التقرير التجريبي", true);
+        return;
+      }
+      const emailMsg = rb.results?.email
+        ? (rb.results.email.success ? "✅ الإيميل: تم الإرسال بنجاح" : `❌ الإيميل فشل: ${rb.results.email.reason || "سبب غير معروف"}`)
+        : "⚪ الإيميل: غير مُفعّل (لا يوجد مفتاح Resend أو مستلمين محفوظين)";
+      const tgMsg = rb.results?.telegram
+        ? (rb.results.telegram.success ? "✅ تيليجرام: تم الإرسال بنجاح" : `❌ تيليجرام فشل: ${rb.results.telegram.reason || "سبب غير معروف"}`)
+        : "⚪ تيليجرام: غير مُفعّل (لا يوجد Bot Token أو Chat ID محفوظين)";
+      statusEl.style.color = rb.fullySucceeded ? "var(--green)" : "var(--red)";
+      statusEl.innerHTML = `${emailMsg}<br>${tgMsg}`;
+      toast(rb.fullySucceeded ? "تم إرسال التقرير التجريبي بنجاح" : "التقرير التجريبي واجه مشكلة — راجع التفاصيل أسفل الزر", !rb.fullySucceeded);
+    } catch (e) {
+      statusEl.style.color = "var(--red)";
+      statusEl.textContent = "✗ تعذّر الاتصال بخدمة daily-report-service — تأكد إنها منشورة (deployed) على Supabase";
+      toast("تعذّر الاتصال بخدمة التقرير اليومي", true);
+    } finally {
+      btn.disabled = false; btn.textContent = "📨 إرسال تقرير تجريبي الآن";
+    }
   };
 
   $("#ws-daily-report-toggle").onclick = () => {
