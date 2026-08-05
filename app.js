@@ -1373,10 +1373,9 @@ function renderSettings(main) {
       toast(rb.fullySucceeded ? "تم إرسال التقرير التجريبي بنجاح" : "التقرير التجريبي واجه مشكلة — راجع التفاصيل أسفل الزر", !rb.fullySucceeded);
     } catch (e) {
       statusEl.style.color = "var(--red)";
-      statusEl.textContent = "✗ تعذّر الاتصال بخدمة daily-report-service — تأكد إنها منشورة (deployed) على Supabase";
+      statusEl.textContent = "خطأ الاتصال: " + e.message;
+      console.error(e);
       toast("تعذّر الاتصال بخدمة التقرير اليومي", true);
-    } finally {
-      btn.disabled = false; btn.textContent = "📨 إرسال تقرير تجريبي الآن";
     }
   };
 
