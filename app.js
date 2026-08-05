@@ -28,6 +28,7 @@ const ICONS = {
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   truck: '<path d="M1 3h13v13H1z"/><path d="M14 8h4l4 4v4h-8V8z"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/>',
   tag: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.59a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
 };
 function icon(name, size = 16) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
@@ -64,7 +65,7 @@ const CATS_FALLBACK = ["أقمشة", "خيوط", "أزرار وسحابات", "�
 const state = {
   user: null, profile: null,
   settings: { workshop_name: "مصنع نسيج", logo_base64: null, alert_threshold_percent: 15, warning_threshold_percent: 30 },
-  categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [], suppliers: [],
+  categories: [], items: [], transactions: [], profiles: [], auditLog: [], backups: [], suppliers: [], telegramUsers: [],
   tab: "dashboard", selectedItem: null, pollTimer: null, lang: (localStorage.getItem("lang") || "ar"), reportItemFocus: null,
   _alertOpen: false,
 };
@@ -76,7 +77,7 @@ const I18N = {
     brandSub: "إدارة المخازن",
     navDashboard: "لوحة التحكم", navIn: "إدخال مخزون", navOut: "سحب من المخزن", navStock: "المخزون الحالي",
     navReports: "التقارير", navAudit: "سجل العمليات", navUsers: "إدارة المستخدمين", navSettings: "الإعدادات",
-    navItems: "إدارة الأصناف", navSuppliers: "الموردون",
+    navItems: "إدارة الأصناف", navSuppliers: "الموردون", navTelegram: "مستخدمو تيليجرام",
     logout: "خروج",
     // عام
     save: "حفظ", add: "إضافة", delete: "حذف", edit: "تعديل", cancel: "إلغاء", search: "بحث", confirmBtn: "تأكيد",
@@ -128,48 +129,13 @@ const I18N = {
     supplierNotes: "ملاحظات", noSuppliers: "لا يوجد موردون مسجّلون بعد.",
     // حقول الصنف الموسّعة
     itemSupplier: "المورد", itemPrice: "السعر", itemStorage: "مكان التخزين", itemImage: "صورة الصنف", noneOption: "بدون",
-    // زر طي/فرد كل الفئات (المخزون)
-    stockToggleAllTitle: "طي/فرد كل الفئات", stockToggleAllBtn: "طي الكل",
-    // إعدادات الإشعارات (إيميل وتليجرام)
-    notifCardTitle: "إشعارات المخزون المنخفض (إيميل وتليجرام)",
-    notifCardDesc: 'لما أي صنف يوصل لمستوى منخفض أو حرج، النظام يبعت إشعار تلقائي فورًا. الخطوات الكاملة لإنشاء المفاتيح موجودة في ملف <code>migration_notifications.sql</code>.',
-    notifEmailsLabel: "إيميلات الإشعارات (مفصولة بفاصلة)",
-    resendKeyLabel: "مفتاح Resend (لإرسال الإيميلات)",
-    testEmailBoxLabel: "اختبار إرسال بريد إلكتروني حقيقي",
-    testEmailToPlaceholder: "ابعت الاختبار على إيميل إيه؟ مثال: you@example.com",
-    sendTestEmailBtn: "إرسال بريد اختباري",
-    tgTokenLabel: "توكن بوت تليجرام", tgChatLabel: "Chat ID تليجرام", tgGetChatTitle: "الحصول على Chat ID تلقائيًا",
-    testTelegramBoxLabel: "اختبار إرسال رسالة Telegram حقيقية", sendTestTelegramBtn: "إرسال رسالة اختبار Telegram",
-    dailyReportLabel: "تقرير المخزن اليومي",
-    dailyReportDesc: "لو مفعّل، هيتبعت تلقائيًا كل يوم الساعة {time} (بتوقيت اسطنبول) عبر الإيميل وTelegram المتظبطين فوق",
-    enabledLabel: "✓ مفعّل (ON)", disabledLabel: "متوقف (OFF)", saveNotifSettingsBtn: "حفظ إعدادات الإشعارات",
-    backupCardTitle: "النسخ الاحتياطي",
-    backupCardDesc: "نسخة تلقائية كل يوم + إمكانية إنشاء نسخة يدوية أو استعادة نسخة سابقة. الاستعادة ترجّع الأصناف والفئات وبيانات المصنع فقط، وسجل الحركات لا يتأثر أبدًا.",
-    backupNowBtn: "إنشاء نسخة احتياطية الآن",
-    // رسائل حالة الإشعارات (تظهر تحت الحقول أثناء التحقق/الإرسال)
-    checkingResendMsg: "جاري التحقق من مفتاح Resend...", resendVerifiedMsg: "✓ تم التحقق من المفتاح بنجاح",
-    invalidResendMsg: "مفتاح Resend غير صحيح", notSavedInvalidResendMsg: "لم يتم الحفظ — مفتاح Resend غير صحيح",
-    tgBothRequiredMsg: "لازم تكتب توكن البوت وChat ID مع بعض", notSavedTgMissingMsg: "لم يتم الحفظ — بيانات Telegram ناقصة",
-    checkingTgMsg: "جاري التحقق من Telegram...", tgVerifiedMsg: "✓ تم التحقق من البوت بنجاح",
-    invalidTgMsg: "مفتاح Telegram Bot غير صحيح", notSavedInvalidTgMsg: "لم يتم الحفظ — مفتاح Telegram Bot غير صحيح",
-    saveNotifFailMsg: "تعذر حفظ إعدادات الإشعارات — ", notifSavedMsg: "تم حفظ إعدادات الإشعارات",
-    tgTokenFirstMsg: "اكتب توكن البوت الأول",
-    tgGetChatInstructionsMsg: "افتح Telegram وابحث عن البوت، اضغط Start وابعتله أي رسالة، وبعدين ارجع دوس هنا تاني...",
-    chatIdNotFoundMsg: "لم يتم العثور على Chat ID. أرسل رسالة للبوت أولاً ثم حاول مرة أخرى.",
-    chatIdFoundMsg: "✓ تم العثور على Chat ID{title} وتعبئته تلقائيًا",
-    chatIdFirstMsg: "اكتب Chat ID الأول (أو استخدم زر الحصول عليه تلقائيًا)",
-    sendingMsg: "جاري الإرسال...", sendFailedGenericMsg: "فشل الإرسال",
-    tgSendFailToast: "فشل إرسال رسالة Telegram", tgSendOkMsg: "✓ تم إرسال رسالة Telegram بنجاح", tgSendOkToast: "تم إرسال رسالة Telegram بنجاح",
-    resendKeyFirstMsg: "اكتب مفتاح Resend الأول قبل الاختبار", validEmailFirstMsg: "اكتب إيميل صحيح لاستقبال رسالة الاختبار",
-    emailSendFailPrefix: "فشل الإرسال — ", emailUnknownErrorMsg: "خطأ غير معروف", emailSendFailToast: "فشل إرسال البريد الاختباري",
-    emailSendOkMsg: "✓ تم إرسال البريد بنجاح إلى {to} — تأكد إنه وصل (وتحقق من مجلد Spam لو ملقيتوش)", emailSendOkToast: "تم إرسال البريد الاختباري بنجاح",
-    logoSelectedMsg: "تم اختيار الشعار — اضغط حفظ لتأكيده", saveSettingsFailMsg: "تعذر حفظ الإعدادات — ", factoryInfoSavedMsg: "تم حفظ بيانات المصنع",
-    noBackupsMsg: 'لا توجد نسخ احتياطية بعد — اضغط "إنشاء نسخة احتياطية الآن" لعمل أول نسخة.', backupCreatedMsg: "تم إنشاء النسخة الاحتياطية",
-    backupDateCol: "التاريخ والوقت", backupByCol: "بواسطة", downloadJsonTitle: "تنزيل كملف JSON", restoreBackupTitle: "استعادة هذه النسخة",
-    backupLoadFailMsg: "تعذر تحميل النسخة",
-    restoreConfirmMsg: "هل أنت متأكد من استعادة هذه النسخة؟ سيتم استبدال الأصناف والفئات وبيانات المصنع الحالية بمحتوى هذه النسخة. سجل الحركات لن يتأثر. سيتم أخذ نسخة أمان تلقائية قبل الاستعادة.",
-    restoreFailPrefix: "تعذر الاستعادة: ", restoreOkMsg: "تمت الاستعادة بنجاح",
-    creatingMsg: "...جارِ الإنشاء", createBackupFailPrefix: "تعذر إنشاء النسخة: ",
+    // تيليجرام
+    telegramTitle: "مستخدمو تيليجرام", telegramSub: "المستخدمون المسجَّلون تلقائيًا عبر بوت تيليجرام، وأدوارهم للإشعارات",
+    telegramNoUsers: "لسه محدش سجّل في البوت. شارك رابط البوت مع الفريق واطلب منهم الضغط على Start.",
+    telegramActive: "نشط", telegramBlocked: "محظور/موقف", telegramRole: "دور الإشعارات", telegramNoRole: "بدون دور محدد",
+    telegramLastSeen: "آخر ظهور", telegramGenLink: "توليد رابط ربط لمستخدم", telegramGenLinkBtn: "توليد الرابط",
+    telegramLinkGenerated: "انسخ الرابط وابعته للمستخدم — صالح لمدة 24 ساعة ولاستخدام واحد فقط",
+    telegramSendTest: "إرسال رسالة تجريبية لكل المسجَّلين",
   },
   tr: {
     dir: "ltr", loginTitle: "Depo Yönetimi Girişi", loginUser: "Kullanıcı Adı", loginPass: "Şifre",
@@ -177,7 +143,7 @@ const I18N = {
     brandSub: "Depo Yönetimi",
     navDashboard: "Kontrol Paneli", navIn: "Stok Girişi", navOut: "Depodan Çıkış", navStock: "Mevcut Stok",
     navReports: "Raporlar", navAudit: "İşlem Kaydı", navUsers: "Kullanıcı Yönetimi", navSettings: "Ayarlar",
-    navItems: "Ürün Yönetimi", navSuppliers: "Tedarikçiler",
+    navItems: "Ürün Yönetimi", navSuppliers: "Tedarikçiler", navTelegram: "Telegram Kullanıcıları",
     logout: "Çıkış",
     // genel
     save: "Kaydet", add: "Ekle", delete: "Sil", edit: "Düzenle", cancel: "İptal", search: "Ara", confirmBtn: "Onayla",
@@ -227,57 +193,16 @@ const I18N = {
     newSupplierBtn: "Yeni Tedarikçi", supplierName: "Tedarikçi Adı", supplierPhone: "Telefon", supplierEmail: "E-posta",
     supplierNotes: "Notlar", noSuppliers: "Henüz kayıtlı tedarikçi yok.",
     itemSupplier: "Tedarikçi", itemPrice: "Fiyat", itemStorage: "Depolama Yeri", itemImage: "Ürün Görseli", noneOption: "Yok",
-    // Tüm kategorileri daralt/genişlet butonu (Stok)
-    stockToggleAllTitle: "Tüm Kategorileri Daralt/Genişlet", stockToggleAllBtn: "Tümünü Daralt",
-    // Bildirim ayarları (e-posta ve Telegram)
-    notifCardTitle: "Düşük Stok Bildirimleri (E-posta ve Telegram)",
-    notifCardDesc: 'Herhangi bir ürün düşük veya kritik seviyeye ulaştığında sistem otomatik olarak anında bildirim gönderir. Anahtarları oluşturmanın tüm adımları <code>migration_notifications.sql</code> dosyasında bulunmaktadır.',
-    notifEmailsLabel: "Bildirim E-postaları (virgülle ayrılmış)",
-    resendKeyLabel: "Resend Anahtarı (e-posta göndermek için)",
-    testEmailBoxLabel: "Gerçek E-posta Gönderme Testi",
-    testEmailToPlaceholder: "Test hangi e-postaya gönderilsin? Örn: you@example.com",
-    sendTestEmailBtn: "Test E-postası Gönder",
-    tgTokenLabel: "Telegram Bot Tokenı", tgChatLabel: "Telegram Chat ID", tgGetChatTitle: "Chat ID'yi Otomatik Al",
-    testTelegramBoxLabel: "Gerçek Telegram Mesajı Gönderme Testi", sendTestTelegramBtn: "Telegram Test Mesajı Gönder",
-    dailyReportLabel: "Günlük Depo Raporu",
-    dailyReportDesc: "Etkinleştirilirse, yukarıda ayarlanan e-posta ve Telegram üzerinden her gün saat {time}'te (İstanbul saatiyle) otomatik olarak gönderilir",
-    enabledLabel: "✓ Etkin (ON)", disabledLabel: "Durduruldu (OFF)", saveNotifSettingsBtn: "Bildirim Ayarlarını Kaydet",
-    backupCardTitle: "Yedekleme",
-    backupCardDesc: "Her gün otomatik yedekleme + manuel yedek oluşturma veya önceki bir yedeği geri yükleme imkânı. Geri yükleme yalnızca ürünleri, kategorileri ve fabrika bilgilerini geri getirir; hareket kaydı asla etkilenmez.",
-    backupNowBtn: "Şimdi Yedekleme Oluştur",
-    // Bildirim durum mesajları (alanların altında doğrulama/gönderim sırasında görünür)
-    checkingResendMsg: "Resend anahtarı doğrulanıyor...", resendVerifiedMsg: "✓ Anahtar başarıyla doğrulandı",
-    invalidResendMsg: "Resend anahtarı geçersiz", notSavedInvalidResendMsg: "Kaydedilmedi — Resend anahtarı geçersiz",
-    tgBothRequiredMsg: "Bot token ve Chat ID birlikte girilmeli", notSavedTgMissingMsg: "Kaydedilmedi — Telegram bilgileri eksik",
-    checkingTgMsg: "Telegram doğrulanıyor...", tgVerifiedMsg: "✓ Bot başarıyla doğrulandı",
-    invalidTgMsg: "Telegram Bot tokenı geçersiz", notSavedInvalidTgMsg: "Kaydedilmedi — Telegram Bot tokenı geçersiz",
-    saveNotifFailMsg: "Bildirim ayarları kaydedilemedi — ", notifSavedMsg: "Bildirim ayarları kaydedildi",
-    tgTokenFirstMsg: "Önce bot tokenını yazın",
-    tgGetChatInstructionsMsg: "Telegram'ı açın, botu arayın, Start'a basın ve herhangi bir mesaj gönderin, sonra buraya dönüp tekrar tıklayın...",
-    chatIdNotFoundMsg: "Chat ID bulunamadı. Önce bota bir mesaj gönderin, sonra tekrar deneyin.",
-    chatIdFoundMsg: "✓ Chat ID bulundu{title} ve otomatik dolduruldu",
-    chatIdFirstMsg: "Önce Chat ID'yi yazın (veya otomatik alma butonunu kullanın)",
-    sendingMsg: "Gönderiliyor...", sendFailedGenericMsg: "Gönderim başarısız",
-    tgSendFailToast: "Telegram mesajı gönderilemedi", tgSendOkMsg: "✓ Telegram mesajı başarıyla gönderildi", tgSendOkToast: "Telegram mesajı başarıyla gönderildi",
-    resendKeyFirstMsg: "Test etmeden önce Resend anahtarını yazın", validEmailFirstMsg: "Test mesajını almak için geçerli bir e-posta yazın",
-    emailSendFailPrefix: "Gönderim başarısız — ", emailUnknownErrorMsg: "Bilinmeyen hata", emailSendFailToast: "Test e-postası gönderilemedi",
-    emailSendOkMsg: "✓ E-posta {to} adresine başarıyla gönderildi — ulaştığından emin olun (bulamazsanız Spam klasörünü kontrol edin)", emailSendOkToast: "Test e-postası başarıyla gönderildi",
-    logoSelectedMsg: "Logo seçildi — onaylamak için kaydet'e basın", saveSettingsFailMsg: "Ayarlar kaydedilemedi — ", factoryInfoSavedMsg: "Fabrika bilgileri kaydedildi",
-    noBackupsMsg: 'Henüz yedek yok — ilk yedeği oluşturmak için "Şimdi Yedekleme Oluştur"a basın.', backupCreatedMsg: "Yedekleme oluşturuldu",
-    backupDateCol: "Tarih ve Saat", backupByCol: "Kim tarafından", downloadJsonTitle: "JSON dosyası olarak indir", restoreBackupTitle: "Bu yedeği geri yükle",
-    backupLoadFailMsg: "Yedek yüklenemedi",
-    restoreConfirmMsg: "Bu yedeği geri yüklemek istediğinizden emin misiniz? Mevcut ürünler, kategoriler ve fabrika bilgileri bu yedeğin içeriğiyle değiştirilecek. Hareket kaydı etkilenmeyecek. Geri yüklemeden önce otomatik bir güvenlik yedeği alınacak.",
-    restoreFailPrefix: "Geri yükleme başarısız: ", restoreOkMsg: "Geri yükleme başarıyla tamamlandı",
-    creatingMsg: "...Oluşturuluyor", createBackupFailPrefix: "Yedek oluşturulamadı: ",
+    // Telegram
+    telegramTitle: "Telegram Kullanıcıları", telegramSub: "Bot üzerinden otomatik kaydolan kullanıcılar ve bildirim rolleri",
+    telegramNoUsers: "Henüz kimse bota kaydolmadı. Bot bağlantısını ekiple paylaşın ve Start'a basmalarını isteyin.",
+    telegramActive: "Aktif", telegramBlocked: "Engelli/Durduruldu", telegramRole: "Bildirim Rolü", telegramNoRole: "Rol belirlenmedi",
+    telegramLastSeen: "Son Görülme", telegramGenLink: "Kullanıcı için bağlantı oluştur", telegramGenLinkBtn: "Bağlantı Oluştur",
+    telegramLinkGenerated: "Bağlantıyı kopyalayıp kullanıcıya gönderin — 24 saat ve tek kullanım için geçerli",
+    telegramSendTest: "Tüm kayıtlı kullanıcılara test mesajı gönder",
   },
 };
 function t(key) { return (I18N[state.lang] && I18N[state.lang][key]) || I18N.ar[key] || key; }
-// زي t() بالظبط لكن بتستبدل {placeholder} داخل النص بالقيم المُمررة — لدعم النصوص المترجمة اللي فيها جزء ديناميكي
-function tf(key, vars) {
-  let s = t(key);
-  Object.entries(vars || {}).forEach(([k, v]) => { s = s.split(`{${k}}`).join(v); });
-  return s;
-}
 function setLang(lang) {
   state.lang = lang; localStorage.setItem("lang", lang);
   document.documentElement.dir = I18N[lang].dir;
@@ -315,6 +240,7 @@ const TAB_ROLES = {
   items: ["admin", "keeper"],
   suppliers: ["admin", "keeper"],
   users: ["admin"],
+  telegram: ["admin"],
   settings: ["admin"],
 };
 function myRole() { return state.profile?.role || "viewer"; }
@@ -447,6 +373,10 @@ async function loadSuppliers() {
   const { data } = await sb.from("suppliers").select("*").order("name");
   state.suppliers = data || [];
 }
+async function loadTelegramUsers() {
+  const { data } = await sb.from("telegram_users").select("*").order("created_at", { ascending: false });
+  state.telegramUsers = data || [];
+}
 async function loadAll() {
   await Promise.all([loadSettings(), loadCategories(), loadItems(), loadTransactions(), loadProfile()]);
 }
@@ -459,11 +389,8 @@ async function ensureAuditLog() { if (!_auditLoaded) { await loadAuditLog(); _au
 
 /* ---------------- app boot ---------------- */
 async function boot() {
-  // بيانات العلامة التجارية (اسم المصنع/الشعار) والجلسة بيتحمّلوا بالتوازي بدل التوالي —
-  // ده بيقلل وقت الانتظار الأول قبل ظهور أي شاشة بشكل كبير (كانا قبل كده يستنوا بعض بالتتابع)
-  const brandingPromise = loadSettingsForLogin();
-  const sessionPromise = sb.auth.getSession();
-  const [, { data: { session } }] = await Promise.all([brandingPromise, sessionPromise]);
+  await loadSettingsForLogin();
+  const { data: { session } } = await sb.auth.getSession();
   if (session) {
     state.user = session.user;
     await loadAll();
@@ -539,6 +466,7 @@ const NAV = [
   { id: "items", labelKey: "navItems", icon: "tag" },
   { id: "suppliers", labelKey: "navSuppliers", icon: "truck" },
   { id: "users", labelKey: "navUsers", icon: "users" },
+  { id: "telegram", labelKey: "navTelegram", icon: "send" },
   { id: "settings", labelKey: "navSettings", icon: "gear" },
 ];
 function renderNav() {
@@ -554,6 +482,7 @@ function renderNav() {
     if (state.tab === "audit") await loadAuditLog();
     if (state.tab === "users") await loadProfiles();
     if (state.tab === "suppliers") await loadSuppliers();
+    if (state.tab === "telegram") await loadTelegramUsers();
     $("#nav-list").classList.remove("mobile-open");
     $("#mobile-extra-controls").classList.remove("mobile-open");
     render();
@@ -595,6 +524,7 @@ function render() {
   else if (state.tab === "items") renderItemsAdmin(main);
   else if (state.tab === "suppliers") renderSuppliers(main);
   else if (state.tab === "users") renderUsers(main);
+  else if (state.tab === "telegram") renderTelegramUsers(main);
   else if (state.tab === "settings") renderSettings(main);
 }
 
@@ -820,7 +750,7 @@ function renderMoveBody(mode) {
       </div>
       ${!isIn ? `<div class="field"><label>${t("workerLabel")}</label><input id="worker-input" class="input" style="width:100%;" value="${state.profile?.full_name || ""}" placeholder="مثال: أحمد محمد"></div>` : ""}
       <div class="field"><label>${t("noteLabel")}</label><input id="note-input" class="input" style="width:100%;" placeholder="${isIn ? "مثال: توريد جديد من المورد" : "مثال: لتفصيلة قميص رجالي"}"></div>
-      ${(!isIn && willCrit) ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : ""}
+      ${willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : ""}
       <button class="btn-primary" id="move-submit" style="background:${isIn ? "var(--green)" : "var(--ink)"}; display:flex; align-items:center; justify-content:center; gap:8px;">
         ${icon(isIn ? "in" : "out", 18)} ${isIn ? t("confirmIn") : t("confirmOut")}
       </button>
@@ -830,13 +760,6 @@ function renderMoveBody(mode) {
   $("#qty-minus").onclick = () => { sel.qty_input = Math.max(1, sel.qty_input - 1); renderMoveBody(mode); };
   $("#qty-plus").onclick = () => { sel.qty_input = sel.qty_input + 1; renderMoveBody(mode); };
   $("#qty-input").onchange = (e) => { sel.qty_input = Math.max(1, Number(e.target.value) || 1); renderMoveBody(mode); };
-  // الضغط على Enter في أي حقل (الكمية / اسم العامل / الملاحظة) يحفظ العملية مباشرة —
-  // بدل ما يكون لازم المستخدم يوصل بالماوس/باللمس لزرار التأكيد كل مرة
-  $$("#qty-input, #worker-input, #note-input", body).forEach(inputEl => {
-    inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); $("#move-submit").click(); }
-    });
-  });
   $("#move-submit").onclick = async () => {
     const qty = sel.qty_input;
     const worker = isIn ? "" : ($("#worker-input")?.value || "").trim();
@@ -895,7 +818,7 @@ function renderStock(main) {
       <div style="position:relative;"><span style="position:absolute; right:12px; top:11px; color:var(--ink50);">${icon("search", 15)}</span>
         <input id="stock-search" class="input" style="width:240px; padding-right:34px;" placeholder="${t("searchByNameCode")}"></div>
       <select id="stock-cat" class="input"><option value="__all__">${t("all")}</option>${state.categories.map(c => `<option value="${c}">${c}</option>`).join("")}</select>
-      <button class="icon-btn" id="stock-toggle-all" style="width:auto; padding:0 12px; gap:6px; display:inline-flex; align-items:center; font-size:12.5px; font-weight:700;" title="${t("stockToggleAllTitle")}">${icon("grid", 14)} ${t("stockToggleAllBtn")}</button>
+      <button class="icon-btn" id="stock-toggle-all" style="width:auto; padding:0 12px; gap:6px; display:inline-flex; align-items:center; font-size:12.5px; font-weight:700;" title="طي/فرد كل الفئات">${icon("grid", 14)} طي الكل</button>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <table><thead><tr><th>${t("code")}</th><th>${t("itemName")}</th><th>${t("category")}</th><th>${t("quantity")}</th><th>%</th><th>${t("status")}</th><th></th></tr></thead><tbody id="stock-body"></tbody></table>
@@ -1231,55 +1154,53 @@ function renderSettings(main) {
     </div>
 
     <div class="card" style="margin-bottom:18px; max-width:560px;">
-      <div class="card-title" style="margin-bottom:6px;">${icon("alert", 17)} ${t("notifCardTitle")}</div>
-      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">${t("notifCardDesc")}</div>
-      <div class="field"><label>${t("notifEmailsLabel")}</label><input id="ws-emails" class="input" style="width:100%;" value="${state.settings.notify_emails || ""}" placeholder="admin@example.com, manager@example.com"></div>
+      <div class="card-title" style="margin-bottom:6px;">${icon("alert", 17)} إشعارات المخزون المنخفض (إيميل وتليجرام)</div>
+      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">لما أي صنف يوصل لمستوى منخفض أو حرج، النظام يبعت إشعار تلقائي فورًا. الخطوات الكاملة لإنشاء المفاتيح موجودة في ملف <code>migration_notifications.sql</code>.</div>
+      <div class="field"><label>إيميلات الإشعارات (مفصولة بفاصلة)</label><input id="ws-emails" class="input" style="width:100%;" value="${state.settings.notify_emails || ""}" placeholder="admin@example.com, manager@example.com"></div>
       <div class="field">
-        <label>${t("resendKeyLabel")}</label>
+        <label>مفتاح Resend (لإرسال الإيميلات)</label>
         <input id="ws-resend" class="input" style="width:100%;" value="${state.settings.resend_api_key || ""}" placeholder="re_xxxxxxxx">
         <div id="resend-key-status" style="font-size:11.5px; margin-top:6px; min-height:16px;"></div>
       </div>
       <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
-        <label>${t("testEmailBoxLabel")}</label>
+        <label>اختبار إرسال بريد إلكتروني حقيقي</label>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">
-          <input id="ws-test-email-to" class="input" style="flex:1; min-width:200px;" value="${(state.settings.notify_emails || "").split(",")[0].trim()}" placeholder="${t("testEmailToPlaceholder")}">
-          <button class="btn-dark" id="ws-test-email" type="button">${icon("alert", 14)} ${t("sendTestEmailBtn")}</button>
+          <input id="ws-test-email-to" class="input" style="flex:1; min-width:200px;" value="${(state.settings.notify_emails || "").split(",")[0].trim()}" placeholder="ابعت الاختبار على إيميل إيه؟ مثال: you@example.com">
+          <button class="btn-dark" id="ws-test-email" type="button">${icon("alert", 14)} إرسال بريد اختباري</button>
         </div>
         <div id="test-email-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
       </div>
-      <div style="display:flex; gap:10px;">
-        <div class="field" style="flex:1;"><label>${t("tgTokenLabel")}</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
-        <div class="field" style="flex:1;">
-          <label>${t("tgChatLabel")}</label>
-          <div style="display:flex; gap:6px;">
-            <input id="ws-tg-chat" class="input" style="width:100%;" value="${state.settings.telegram_chat_id || ""}" placeholder="-100123456789">
-            <button class="icon-btn" id="ws-tg-getchat" type="button" title="${t("tgGetChatTitle")}" style="flex-shrink:0; width:auto; padding:0 10px;">${icon("search", 13)}</button>
-          </div>
+      <div class="field"><label>توكن بوت تليجرام</label><input id="ws-tg-token" class="input" style="width:100%;" value="${state.settings.telegram_bot_token || ""}" placeholder="123456:ABC-..."></div>
+      <div class="field">
+        <label>سر التحقق من Webhook</label>
+        <div style="display:flex; gap:6px;">
+          <input id="ws-tg-webhook-secret" class="input" style="width:100%;" value="${state.settings.telegram_webhook_secret || ""}" placeholder="قيمة عشوائية طويلة من اختيارك">
+          <button class="icon-btn" id="ws-tg-gen-secret" type="button" title="توليد قيمة عشوائية" style="flex-shrink:0; width:auto; padding:0 10px;">${icon("search", 13)}</button>
         </div>
+        <div style="font-size:11px; color:var(--ink70); margin-top:4px;">لازم تحط نفس القيمة دي بالظبط كـ Supabase Secret باسم TELEGRAM_WEBHOOK_SECRET.</div>
       </div>
       <div id="tg-key-status" style="font-size:11.5px; margin:-6px 0 8px; min-height:16px;"></div>
       <div class="field" style="background:var(--paper); border-radius:10px; padding:12px;">
-        <label>${t("testTelegramBoxLabel")}</label>
-        <div style="margin-top:6px;">
-          <button class="btn-dark" id="ws-test-telegram" type="button">${icon("alert", 14)} ${t("sendTestTelegramBtn")}</button>
-        </div>
-        <div id="test-telegram-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+        <label>تفعيل استقبال التسجيل التلقائي من تيليجرام</label>
+        <div style="font-size:11.5px; color:var(--ink70); margin:4px 0 8px;">أي شخص يضغط Start على البوت يتسجل تلقائيًا ويوصله أي تنبيه — من غير أي إدخال Chat ID يدوي. راجع تبويب "${t("navTelegram")}" لإدارة المسجَّلين وأدوارهم.</div>
+        <button class="btn-dark" id="ws-tg-webhook-activate" type="button">${icon("send", 14)} تفعيل / تحديث Webhook</button>
+        <div id="webhook-status" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
       </div>
       <div class="field" style="background:var(--paper); border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
         <div>
-          <label style="margin-bottom:2px;">${t("dailyReportLabel")}</label>
-          <div style="font-size:11.5px; color:var(--ink70);">${tf("dailyReportDesc", { time: state.settings.daily_report_time || "16:00" })}</div>
+          <label style="margin-bottom:2px;">تقرير المخزن اليومي</label>
+          <div style="font-size:11.5px; color:var(--ink70);">لو مفعّل، هيتبعت تلقائيًا كل يوم الساعة ${state.settings.daily_report_time || "16:00"} (بتوقيت اسطنبول) عبر الإيميل وTelegram المتظبطين فوق</div>
         </div>
-        <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? t("enabledLabel") : t("disabledLabel")}</button>
+        <button type="button" id="ws-daily-report-toggle" class="lang-btn ${state.settings.daily_report_enabled ? "active-lang" : ""}" style="flex-shrink:0; padding:8px 16px;" data-on="${state.settings.daily_report_enabled ? "1" : "0"}">${state.settings.daily_report_enabled ? "✓ مفعّل (ON)" : "متوقف (OFF)"}</button>
       </div>
-      <button class="btn-primary" id="ws-save-notify">${t("saveNotifSettingsBtn")}</button>
+      <button class="btn-primary" id="ws-save-notify">حفظ إعدادات الإشعارات</button>
     </div>
 
     ${isAdmin() ? `
     <div class="card" style="margin-bottom:18px; max-width:560px;">
-      <div class="card-title" style="margin-bottom:6px;">${icon("history", 17)} ${t("backupCardTitle")}</div>
-      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">${t("backupCardDesc")}</div>
-      <button class="btn-dark" id="backup-now" style="margin-bottom:16px;">${icon("download", 14)} ${t("backupNowBtn")}</button>
+      <div class="card-title" style="margin-bottom:6px;">${icon("history", 17)} النسخ الاحتياطي</div>
+      <div style="font-size:11.5px; color:var(--ink70); margin-bottom:14px;">نسخة تلقائية كل يوم + إمكانية إنشاء نسخة يدوية أو استعادة نسخة سابقة. الاستعادة ترجّع الأصناف والفئات وبيانات المصنع فقط، وسجل الحركات لا يتأثر أبدًا.</div>
+      <button class="btn-dark" id="backup-now" style="margin-bottom:16px;">${icon("download", 14)} إنشاء نسخة احتياطية الآن</button>
       <div id="backups-list"></div>
     </div>` : ""}`;
 
@@ -1289,7 +1210,7 @@ function renderSettings(main) {
   $("#ws-logo").onchange = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => { logoData = reader.result; toast(t("logoSelectedMsg")); };
+    reader.onload = () => { logoData = reader.result; toast("تم اختيار الشعار — اضغط حفظ لتأكيده"); };
     reader.readAsDataURL(file);
   };
   $("#ws-save").onclick = async () => {
@@ -1302,8 +1223,8 @@ function renderSettings(main) {
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
-    if (error) { toast(t("saveSettingsFailMsg") + (error.message || ""), true); return; }
-    await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast(t("factoryInfoSavedMsg"));
+    if (error) { toast("تعذر حفظ الإعدادات — " + (error.message || ""), true); return; }
+    await loadSettings(); applyBranding(); logAudit({ action: "تعديل إعدادات المصنع", entity: "settings" }); toast("تم حفظ بيانات المصنع");
   };
 
   $("#ws-save-notify").onclick = async () => {
@@ -1312,60 +1233,53 @@ function renderSettings(main) {
     const tgStatusEl = $("#tg-key-status");
     const resendKey = $("#ws-resend").value.trim();
     const tgToken = $("#ws-tg-token").value.trim();
-    const tgChat = $("#ws-tg-chat").value.trim();
+    const tgWebhookSecret = $("#ws-tg-webhook-secret").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
     tgStatusEl.textContent = ""; tgStatusEl.style.color = "";
 
     // لا نسمح بحفظ مفتاح Resend غير صحيح — نتحقق منه فعليًا مع Resend قبل أي حفظ
     if (resendKey) {
-      saveBtn.disabled = true; saveBtn.textContent = t("checkingResendMsg");
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من مفتاح Resend...";
       const check = await callEmailService({ action: "validate", apiKey: resendKey });
-      saveBtn.disabled = false; saveBtn.textContent = t("saveNotifSettingsBtn");
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
       if (check.error || !check.valid) {
         statusEl.style.color = "var(--red)";
-        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || t("invalidResendMsg")) : check.error);
-        toast(t("notSavedInvalidResendMsg"), true);
+        statusEl.textContent = "✗ " + (check.valid === false ? (check.reason || "مفتاح Resend غير صحيح") : check.error);
+        toast("لم يتم الحفظ — مفتاح Resend غير صحيح", true);
         return; // إيقاف الحفظ تمامًا — مفيش حفظ لمفتاح غلط
       }
       statusEl.style.color = "var(--green)";
-      statusEl.textContent = t("resendVerifiedMsg");
+      statusEl.textContent = "✓ تم التحقق من المفتاح بنجاح";
     }
 
-    // نفس أسلوب التحقق بالظبط لكن لـ Telegram Bot Token — لازم يكون التوكن والـ Chat ID
-    // موجودين مع بعض أو فاضيين مع بعض (مش هينفع توكن من غير Chat ID أو العكس)
-    if (tgToken || tgChat) {
-      if (!tgToken || !tgChat) {
-        tgStatusEl.style.color = "var(--red)";
-        tgStatusEl.textContent = "✗ " + t("tgBothRequiredMsg");
-        toast(t("notSavedTgMissingMsg"), true);
-        return;
-      }
-      saveBtn.disabled = true; saveBtn.textContent = t("checkingTgMsg");
+    // التحقق من صحة توكن Telegram Bot (Chat ID مالوش داعي دلوقتي — التسجيل بقى تلقائي بالكامل)
+    if (tgToken) {
+      saveBtn.disabled = true; saveBtn.textContent = "جاري التحقق من Telegram...";
       const tgCheck = await callTelegramService({ action: "validate", token: tgToken });
-      saveBtn.disabled = false; saveBtn.textContent = t("saveNotifSettingsBtn");
+      saveBtn.disabled = false; saveBtn.textContent = "حفظ إعدادات الإشعارات";
       if (tgCheck.error || !tgCheck.valid) {
         tgStatusEl.style.color = "var(--red)";
-        tgStatusEl.textContent = "✗ " + (tgCheck.valid === false ? (tgCheck.reason || t("invalidTgMsg")) : tgCheck.error);
-        toast(t("notSavedInvalidTgMsg"), true);
+        tgStatusEl.textContent = "✗ " + (tgCheck.valid === false ? (tgCheck.reason || "مفتاح Telegram Bot غير صحيح") : tgCheck.error);
+        toast("لم يتم الحفظ — مفتاح Telegram Bot غير صحيح", true);
         return; // إيقاف الحفظ تمامًا — مفيش حفظ لتوكن غلط
       }
       tgStatusEl.style.color = "var(--green)";
-      tgStatusEl.textContent = `${t("tgVerifiedMsg")}${tgCheck.botUsername ? " (@" + tgCheck.botUsername + ")" : ""}`;
+      tgStatusEl.textContent = `✓ تم التحقق من البوت بنجاح${tgCheck.botUsername ? " (@" + tgCheck.botUsername + ")" : ""}`;
     }
 
     const payload = {
       notify_emails: $("#ws-emails").value.trim(),
       resend_api_key: resendKey,
       telegram_bot_token: tgToken,
-      telegram_chat_id: tgChat,
+      telegram_webhook_secret: tgWebhookSecret,
       daily_report_enabled: $("#ws-daily-report-toggle").dataset.on === "1",
       updated_at: new Date().toISOString(),
     };
     const { error } = await sb.from("settings").update(payload).eq("id", 1);
-    if (error) { toast(t("saveNotifFailMsg") + (error.message || ""), true); return; }
+    if (error) { toast("تعذر حفظ إعدادات الإشعارات — " + (error.message || ""), true); return; }
     await loadSettings();
     logAudit({ action: "تعديل إعدادات الإشعارات", entity: "settings" });
-    toast(t("notifSavedMsg"));
+    toast("تم حفظ إعدادات الإشعارات");
   };
 
   $("#ws-daily-report-toggle").onclick = () => {
@@ -1373,48 +1287,45 @@ function renderSettings(main) {
     const isOn = btn.dataset.on === "1";
     btn.dataset.on = isOn ? "0" : "1";
     btn.classList.toggle("active-lang", !isOn);
-    btn.textContent = !isOn ? t("enabledLabel") : t("disabledLabel");
+    btn.textContent = !isOn ? "✓ مفعّل (ON)" : "متوقف (OFF)";
   };
 
-  $("#ws-tg-getchat").onclick = async () => {
-    const tgToken = $("#ws-tg-token").value.trim();
-    const statusEl = $("#tg-key-status");
-    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ " + t("tgTokenFirstMsg"); return; }
-    statusEl.style.color = "var(--ink70)";
-    statusEl.textContent = t("tgGetChatInstructionsMsg");
-    const res = await callTelegramService({ action: "getChatId", token: tgToken });
-    if (res.error || !res.found) {
-      statusEl.style.color = "var(--red)";
-      statusEl.textContent = "✗ " + (res.reason || res.error || t("chatIdNotFoundMsg"));
-      return;
-    }
-    $("#ws-tg-chat").value = res.chatId;
-    statusEl.style.color = "var(--green)";
-    statusEl.textContent = tf("chatIdFoundMsg", { title: res.chatTitle ? " (" + res.chatTitle + ")" : "" });
+  $("#ws-tg-gen-secret").onclick = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const secret = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+    $("#ws-tg-webhook-secret").value = secret;
+    toast("تم توليد سر جديد — لازم تحفظ الإعدادات، وتحط نفس القيمة كـ Supabase Secret، ثم تضغط تفعيل Webhook");
   };
 
-  $("#ws-test-telegram").onclick = async () => {
-    const testBtn = $("#ws-test-telegram");
-    const statusEl = $("#test-telegram-status");
+  $("#ws-tg-webhook-activate").onclick = async () => {
+    const btn = $("#ws-tg-webhook-activate");
+    const statusEl = $("#webhook-status");
     const tgToken = $("#ws-tg-token").value.trim();
-    const tgChat = $("#ws-tg-chat").value.trim();
+    const secret = $("#ws-tg-webhook-secret").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
 
-    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ " + t("tgTokenFirstMsg"); return; }
-    if (!tgChat) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ " + t("chatIdFirstMsg"); return; }
+    if (!tgToken) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب توكن البوت الأول"; return; }
+    if (!secret) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب أو ولّد سر Webhook الأول"; return; }
 
-    testBtn.disabled = true; testBtn.textContent = t("sendingMsg");
-    const res = await callTelegramService({ action: "sendTest", token: tgToken, chatId: tgChat });
-    testBtn.disabled = false; testBtn.textContent = t("sendTestTelegramBtn");
-
-    if (res.error || res.success === false) {
+    btn.disabled = true; btn.textContent = "...جارِ التفعيل";
+    try {
+      const webhookUrl = `${SUPABASE_URL}/functions/v1/telegram-webhook`;
+      const res = await fetch(`https://api.telegram.org/bot${tgToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${encodeURIComponent(secret)}`);
+      const data = await res.json();
+      if (data.ok) {
+        statusEl.style.color = "var(--green)";
+        statusEl.textContent = "✓ تم تفعيل الـ Webhook بنجاح — البرنامج جاهز يستقبل تسجيلات تلقائية";
+        toast("تم تفعيل Webhook بنجاح");
+      } else {
+        statusEl.style.color = "var(--red)";
+        statusEl.textContent = "✗ " + (data.description || "فشل التفعيل");
+        toast("فشل تفعيل Webhook", true);
+      }
+    } catch (e) {
       statusEl.style.color = "var(--red)";
-      statusEl.textContent = "✗ " + (res.reason || res.error || t("sendFailedGenericMsg"));
-      toast(t("tgSendFailToast"), true);
-    } else {
-      statusEl.style.color = "var(--green)";
-      statusEl.textContent = t("tgSendOkMsg");
-      toast(t("tgSendOkToast"));
+      statusEl.textContent = "✗ تعذر الاتصال بتيليجرام — تأكد من توكن البوت والاتصال بالإنترنت";
+    } finally {
+      btn.disabled = false; btn.innerHTML = `${icon("send", 14)} تفعيل / تحديث Webhook`;
     }
   };
 
@@ -1425,21 +1336,21 @@ function renderSettings(main) {
     const to = $("#ws-test-email-to").value.trim();
     statusEl.textContent = ""; statusEl.style.color = "";
 
-    if (!resendKey) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ " + t("resendKeyFirstMsg"); return; }
-    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ " + t("validEmailFirstMsg"); return; }
+    if (!resendKey) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب مفتاح Resend الأول قبل الاختبار"; return; }
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { statusEl.style.color = "var(--red)"; statusEl.textContent = "✗ اكتب إيميل صحيح لاستقبال رسالة الاختبار"; return; }
 
-    testBtn.disabled = true; testBtn.textContent = t("sendingMsg");
+    testBtn.disabled = true; testBtn.textContent = "جاري الإرسال...";
     const res = await callEmailService({ action: "sendTest", apiKey: resendKey, to });
-    testBtn.disabled = false; testBtn.textContent = t("sendTestEmailBtn");
+    testBtn.disabled = false; testBtn.textContent = "إرسال بريد اختباري";
 
     if (res.error || res.success === false) {
       statusEl.style.color = "var(--red)";
-      statusEl.textContent = "✗ " + t("emailSendFailPrefix") + (res.reason || res.error || t("emailUnknownErrorMsg"));
-      toast(t("emailSendFailToast"), true);
+      statusEl.textContent = "✗ فشل الإرسال — " + (res.reason || res.error || "خطأ غير معروف");
+      toast("فشل إرسال البريد الاختباري", true);
     } else {
       statusEl.style.color = "var(--green)";
-      statusEl.textContent = tf("emailSendOkMsg", { to });
-      toast(t("emailSendOkToast"));
+      statusEl.textContent = `✓ تم إرسال البريد بنجاح إلى ${to} — تأكد إنه وصل (وتحقق من مجلد Spam لو ملقيتوش)`;
+      toast("تم إرسال البريد الاختباري بنجاح");
     }
   };
 }
@@ -1450,21 +1361,21 @@ async function loadAndDrawBackups(main) {
   const list = $("#backups-list");
   if (!list) return;
   list.innerHTML = state.backups.length ? `
-    <table><thead><tr><th>${t("backupDateCol")}</th><th>${t("backupByCol")}</th><th></th></tr></thead><tbody>
+    <table><thead><tr><th>التاريخ والوقت</th><th>بواسطة</th><th></th></tr></thead><tbody>
       ${state.backups.map(b => `
         <tr>
           <td class="mono">${fmtDate(b.created_at)}</td>
           <td style="color:var(--ink70);">${b.created_by || "—"}</td>
           <td><div style="display:flex; gap:8px; justify-content:flex-end;">
-            <button class="icon-btn" data-dl-backup="${b.id}" title="${t("downloadJsonTitle")}">${icon("download", 13)}</button>
-            <button class="icon-btn" style="color:var(--red);" data-restore-backup="${b.id}" title="${t("restoreBackupTitle")}">${icon("history", 13)}</button>
+            <button class="icon-btn" data-dl-backup="${b.id}" title="تنزيل كملف JSON">${icon("download", 13)}</button>
+            <button class="icon-btn" style="color:var(--red);" data-restore-backup="${b.id}" title="استعادة هذه النسخة">${icon("history", 13)}</button>
           </div></td>
         </tr>`).join("")}
-    </tbody></table>` : `<div class="empty-note">${t("noBackupsMsg")}</div>`;
+    </tbody></table>` : `<div class="empty-note">لا توجد نسخ احتياطية بعد — اضغط "إنشاء نسخة احتياطية الآن" لعمل أول نسخة.</div>`;
 
   $$("[data-dl-backup]").forEach(b => b.onclick = async () => {
     const { data } = await sb.from("backups").select("*").eq("id", b.dataset.dlBackup).maybeSingle();
-    if (!data) { toast(t("backupLoadFailMsg"), true); return; }
+    if (!data) { toast("تعذر تحميل النسخة", true); return; }
     const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1473,24 +1384,24 @@ async function loadAndDrawBackups(main) {
   });
 
   $$("[data-restore-backup]").forEach(b => b.onclick = async () => {
-    if (!confirm(t("restoreConfirmMsg"))) return;
+    if (!confirm("هل أنت متأكد من استعادة هذه النسخة؟ سيتم استبدال الأصناف والفئات وبيانات المصنع الحالية بمحتوى هذه النسخة. سجل الحركات لن يتأثر. سيتم أخذ نسخة أمان تلقائية قبل الاستعادة.")) return;
     const { error } = await sb.rpc("restore_backup", { backup_id: b.dataset.restoreBackup });
-    if (error) { toast(t("restoreFailPrefix") + error.message, true); return; }
+    if (error) { toast("تعذر الاستعادة: " + error.message, true); return; }
     logAudit({ action: "استعادة نسخة احتياطية", entity: "backup", entityName: b.dataset.restoreBackup });
     await Promise.all([loadItems(), loadCategories(), loadSettings()]);
     applyBranding();
-    toast(t("restoreOkMsg"));
+    toast("تمت الاستعادة بنجاح");
     renderSettings(main);
   });
 
   const btn = $("#backup-now");
   if (btn) btn.onclick = async () => {
-    btn.disabled = true; btn.textContent = t("creatingMsg");
+    btn.disabled = true; btn.textContent = "...جارِ الإنشاء";
     const { error } = await sb.rpc("create_backup", { actor: state.profile?.full_name || "يدوي" });
-    btn.disabled = false; btn.innerHTML = `${icon("download", 14)} ${t("backupNowBtn")}`;
-    if (error) { toast(t("createBackupFailPrefix") + error.message, true); return; }
+    btn.disabled = false; btn.innerHTML = `${icon("download", 14)} إنشاء نسخة احتياطية الآن`;
+    if (error) { toast("تعذر إنشاء النسخة: " + error.message, true); return; }
     logAudit({ action: "إنشاء نسخة احتياطية يدوية", entity: "backup" });
-    toast(t("backupCreatedMsg"));
+    toast("تم إنشاء النسخة الاحتياطية");
     await loadAndDrawBackups(main);
   };
 }
@@ -1945,6 +1856,126 @@ function openSupplierModal(existing, main) {
   };
 }
 
+/* ---------------- شاشة إدارة مستخدمي تيليجرام (للمدير فقط) ---------------- */
+async function renderTelegramUsers(main) {
+  if (!_profilesLoaded) await ensureProfiles();
+
+  let botUsername = null;
+  if (state.settings.telegram_bot_token) {
+    const check = await callTelegramService({ action: "validate", token: state.settings.telegram_bot_token });
+    if (check && check.valid) botUsername = check.botUsername || null;
+  }
+  const botLink = botUsername ? `https://t.me/${botUsername}` : null;
+
+  main.innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">${t("telegramTitle")}</div><div class="section-sub">${t("telegramSub")}</div></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-dark" id="tg-send-test">${icon("send", 14)} ${t("telegramSendTest")}</button>
+      </div>
+    </div>
+
+    ${!state.settings.telegram_bot_token ? `
+      <div class="card" style="margin-bottom:18px;">
+        <div style="color:var(--ink70); font-size:13px;">لازم تحط توكن بوت تليجرام في تبويب "${t("navSettings")}" الأول.</div>
+      </div>` : `
+      <div class="card" style="margin-bottom:18px;">
+        ${botLink ? `
+          <div style="font-size:13px; margin-bottom:10px;">شارك الرابط ده مع أي حد عايز يستقبل الإشعارات — يضغط عليه، وبعدين Start، ويتسجل تلقائيًا:</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <code style="background:var(--paper); padding:8px 12px; border-radius:8px; font-size:12.5px;">${botLink}</code>
+            <button class="btn-dark" id="tg-copy-bot-link" type="button">نسخ</button>
+          </div>` : `<div style="color:var(--red); font-size:13px;">تعذر التحقق من توكن البوت — راجعه في الإعدادات.</div>`}
+
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+          <label style="display:block; margin-bottom:8px; font-weight:700; font-size:13px;">${t("telegramGenLink")}</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <select id="tg-link-user-select" class="input" style="flex:1; min-width:200px;">
+              ${(state.profiles || []).map(p => `<option value="${p.id}">${p.full_name || p.username || p.id}</option>`).join("")}
+            </select>
+            <button class="btn-primary" id="tg-gen-link-btn" type="button">${t("telegramGenLinkBtn")}</button>
+          </div>
+          <div id="tg-gen-link-result" style="margin-top:10px; font-size:12.5px;"></div>
+        </div>
+      </div>`}
+
+    <div class="card">
+      ${!state.telegramUsers.length ? `<div class="empty-note">${t("telegramNoUsers")}</div>` : `
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead><tr>
+            <th>${t("fullNameLabel")}</th><th>Username</th><th>${t("status")}</th>
+            <th>${t("telegramRole")}</th><th>${t("telegramLastSeen")}</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${state.telegramUsers.map(u => `
+              <tr>
+                <td>${[u.first_name, u.last_name].filter(Boolean).join(" ") || "—"}</td>
+                <td>${u.username ? "@" + u.username : "—"}</td>
+                <td>${u.is_active ? `<span class="chip chip-ok">${t("telegramActive")}</span>` : `<span class="chip chip-critical">${t("telegramBlocked")}</span>`}</td>
+                <td>
+                  <select class="input" data-tg-role="${u.id}" style="min-width:150px;">
+                    <option value="">${t("telegramNoRole")}</option>
+                    ${Object.keys(ROLE_LABELS).map(r => `<option value="${r}" ${u.role === r ? "selected" : ""}>${ROLE_LABELS[r]}</option>`).join("")}
+                  </select>
+                </td>
+                <td style="white-space:nowrap;">${u.last_seen_at ? fmtDate(u.last_seen_at) : "—"}</td>
+                <td>
+                  <button class="icon-btn" data-tg-toggle="${u.id}" data-active="${u.is_active}" title="${u.is_active ? t("telegramBlocked") : t("telegramActive")}">${icon(u.is_active ? "x" : "check", 14)}</button>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`}
+    </div>
+  `;
+
+  const copyBtn = $("#tg-copy-bot-link");
+  if (copyBtn) copyBtn.onclick = () => { navigator.clipboard.writeText(botLink); toast("تم نسخ الرابط"); };
+
+  const genBtn = $("#tg-gen-link-btn");
+  if (genBtn) genBtn.onclick = async () => {
+    const profileId = $("#tg-link-user-select").value;
+    const resultEl = $("#tg-gen-link-result");
+    if (!profileId) return;
+    genBtn.disabled = true; genBtn.textContent = "...";
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await sb.from("telegram_link_tokens").insert({ token, profile_id: profileId, expires_at: expires });
+    genBtn.disabled = false; genBtn.textContent = t("telegramGenLinkBtn");
+    if (error) { toast("تعذر توليد الرابط — " + error.message, true); return; }
+    const link = `${botLink}?start=${token}`;
+    resultEl.innerHTML = `<div style="color:var(--ink70); margin-bottom:6px;">${t("telegramLinkGenerated")}</div><code style="background:var(--paper); padding:8px 12px; border-radius:8px; display:inline-block;">${link}</code>`;
+  };
+
+  $$("[data-tg-role]").forEach(sel => sel.onchange = async () => {
+    const id = sel.dataset.tgRole;
+    const role = sel.value || null;
+    const { error } = await sb.from("telegram_users").update({ role }).eq("id", id);
+    if (error) { toast("تعذر حفظ الدور — " + error.message, true); return; }
+    const u = state.telegramUsers.find(x => x.id === id); if (u) u.role = role;
+    toast("تم تحديث الدور");
+  });
+
+  $$("[data-tg-toggle]").forEach(btn => btn.onclick = async () => {
+    const id = btn.dataset.tgToggle;
+    const isActive = btn.dataset.active === "true";
+    const { error } = await sb.from("telegram_users").update({ is_active: !isActive, blocked_at: !isActive ? null : new Date().toISOString() }).eq("id", id);
+    if (error) { toast("تعذر تحديث الحالة — " + error.message, true); return; }
+    await loadTelegramUsers();
+    renderTelegramUsers(main);
+  });
+
+  $("#tg-send-test").onclick = async () => {
+    const btn = $("#tg-send-test");
+    btn.disabled = true; btn.innerHTML = "...جارِ الإرسال";
+    const res = await callSendTelegram({ type: "manual", target: { mode: "all" }, message: "✅ رسالة تجريبية من نظام إدارة المخزن — لو وصلتك يبقى كل حاجة شغالة تمام." });
+    btn.disabled = false; btn.innerHTML = `${icon("send", 14)} ${t("telegramSendTest")}`;
+    if (res.error) { toast("فشل الإرسال — " + res.error, true); return; }
+    toast(`تم الإرسال: ${res.sent} نجح، ${res.failed} فشل، ${res.blocked} محظور (من إجمالي ${res.total})`);
+  };
+}
+
 /* ---------------- user management (admin only) ---------------- */
 async function renderUsers(main) {
   if (!_profilesLoaded) { main.innerHTML = `<div class="empty-note">جاري تحميل بيانات المستخدمين...</div>`; await ensureProfiles(); if (state.tab !== "users") return; }
@@ -2043,6 +2074,23 @@ async function callTelegramService(payload) {
     return { error: "تعذر الاتصال بخدمة Telegram — تأكد إن الـ Edge Function \"telegram-service\" متنشرة على Supabase" };
   }
 }
+/* إرسال إشعار تيليجرام لكل المستخدمين المسجَّلين تلقائيًا (أو حسب الدور/مستخدم/مجموعة)
+   عبر فنكشن send-telegram الجديد — بديل نظام Chat ID الواحد القديم */
+async function callSendTelegram({ type, target, message }) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-telegram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}`, "apikey": SUPABASE_ANON_KEY },
+      body: JSON.stringify({ type, target, message }),
+    });
+    const json = await res.json();
+    if (!res.ok) return { error: json.error || "حدث خطأ غير متوقع" };
+    return json;
+  } catch (e) {
+    return { error: "تعذر الاتصال بخدمة send-telegram — تأكد إنها متنشرة على Supabase" };
+  }
+}
 
 /* ---------------- طبقة إشعارات مشتركة: Email + Telegram معًا ----------------
    كل قناة مستقلة تمامًا عن التانية: فشل Telegram ميوقفش الإيميل، والعكس. */
@@ -2060,13 +2108,17 @@ async function notifyStockAlert(itemName, qty, maxQty, unit, pct, level) {
       if (results.email?.error || results.email?.success === false) console.warn("تعذر إرسال تنبيه المخزون بالإيميل:", results.email.reason || results.email.error);
     }
   }
-  if (state.settings.telegram_bot_token && state.settings.telegram_chat_id) {
+  if (state.settings.telegram_bot_token) {
     const isCritical = level === "critical";
     const text = `${isCritical ? "🚨" : "⚠️"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}\n\nالصنف:\n${itemName}\n\nالكمية الحالية:\n${qty} ${unit || ""}\n\nالحد الأقصى:\n${maxQty} ${unit || ""}\n\nالنسبة:\n${Math.round(pct)}%`;
     try {
-      results.telegram = await callTelegramService({ action: "sendAlert", token: state.settings.telegram_bot_token, chatId: state.settings.telegram_chat_id, text });
+      results.telegram = await callSendTelegram({
+        type: isCritical ? "stock_critical" : "stock_warning",
+        target: { mode: "all" },
+        message: text,
+      });
     } catch (e) { results.telegram = { error: String(e) }; }
-    if (results.telegram?.error || results.telegram?.success === false) console.warn("تعذر إرسال تنبيه المخزون بتيليجرام:", results.telegram.reason || results.telegram.error);
+    if (results.telegram?.error) console.warn("تعذر إرسال تنبيه المخزون بتيليجرام:", results.telegram.error);
   }
   return results;
 }
@@ -2433,74 +2485,34 @@ function openResetPasswordModal(p, main) {
         <button class="close-x" id="rp-close">${icon("x", 15)}</button>
       </div>
       <div id="rp-step1">
-        <div style="display:flex; gap:8px; margin-bottom:16px; background:var(--paper-deep); padding:4px; border-radius:10px;">
-          <button type="button" class="lang-btn rp-mode-btn active-lang" data-mode="auto" style="flex:1;">توليد تلقائي</button>
-          <button type="button" class="lang-btn rp-mode-btn" data-mode="custom" style="flex:1;">تحديد كلمة مرور</button>
+        <div style="font-size:13px; color:var(--ink70); line-height:1.8; margin-bottom:16px;">
+          هيتم توليد كلمة مرور مؤقتة جديدة للحساب ده. المستخدم هيُطلب منه تغييرها فور تسجيل الدخول. سلّمها له مباشرة (تليفون / واتساب) بدون ما تكتبها في أي مكان تاني.
         </div>
-        <div id="rp-auto-box">
-          <div style="font-size:13px; color:var(--ink70); line-height:1.8; margin-bottom:16px;">
-            هيتم توليد كلمة مرور مؤقتة جديدة للحساب ده. المستخدم هيُطلب منه تغييرها فور تسجيل الدخول. سلّمها له مباشرة (تليفون / واتساب) بدون ما تكتبها في أي مكان تاني.
-          </div>
-        </div>
-        <div id="rp-custom-box" class="hidden">
-          <div style="font-size:13px; color:var(--ink70); line-height:1.8; margin-bottom:12px;">
-            لو المستخدم أعطاك كلمة المرور اللي يريدها، اكتبها هنا بالظبط. هتُطلب منه تأكيدها/تغييرها فور تسجيل الدخول برضه.
-          </div>
-          <div class="field"><label>كلمة المرور</label><input id="rp-custom-input" type="text" class="input" style="width:100%;" placeholder="6 أحرف على الأقل"></div>
-        </div>
-        <button class="btn-primary" id="rp-generate" style="width:100%; margin-top:4px;">توليد كلمة مرور مؤقتة</button>
+        <button class="btn-primary" id="rp-generate">توليد كلمة مرور مؤقتة</button>
       </div>
       <div id="rp-step2" class="hidden">
-        <div style="font-size:12.5px; color:var(--ink70); margin-bottom:8px;">كلمة المرور المحفوظة:</div>
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <div style="font-size:12.5px; color:var(--ink70); margin-bottom:8px;">كلمة المرور المؤقتة (هتظهر مرة واحدة بس):</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
           <div id="rp-temp-pass" class="mono" style="flex:1; background:var(--paper-deep); border-radius:10px; padding:12px 14px; font-size:16px; font-weight:800; letter-spacing:1px; text-align:center;"></div>
           <button class="icon-btn" id="rp-copy" title="نسخ">${icon("copy", 15)}</button>
         </div>
-        <div id="rp-masked-note" class="hidden" style="font-size:11.5px; color:var(--ink50); margin-bottom:16px;">تم إخفاؤها الآن لحمايتها — تقدر تنسخها قبل الإغلاق لو محتاجها.</div>
         <button class="btn-dark" id="rp-done" style="width:100%;">تم — أغلق</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   $("#rp-close", overlay).onclick = () => overlay.remove();
-
-  let mode = "auto";
-  $$(".rp-mode-btn", overlay).forEach(b => b.onclick = () => {
-    mode = b.dataset.mode;
-    $$(".rp-mode-btn", overlay).forEach(x => x.classList.toggle("active-lang", x === b));
-    $("#rp-auto-box", overlay).classList.toggle("hidden", mode !== "auto");
-    $("#rp-custom-box", overlay).classList.toggle("hidden", mode !== "custom");
-    $("#rp-generate", overlay).textContent = mode === "auto" ? "توليد كلمة مرور مؤقتة" : "حفظ كلمة المرور";
-  });
-
   $("#rp-generate", overlay).onclick = async () => {
-    const btn = $("#rp-generate", overlay);
-    let customPassword = null;
-    if (mode === "custom") {
-      customPassword = $("#rp-custom-input", overlay).value;
-      if (customPassword.length < 6) { toast("كلمة المرور لازم تكون 6 أحرف على الأقل", true); return; }
-    }
-    const origText = btn.textContent;
-    btn.disabled = true; btn.textContent = "جاري الحفظ...";
-    const res = await callManageUsers({ action: "resetPassword", userId: p.id, customPassword: customPassword || undefined });
-    if (res.error) { toast(res.error, true); btn.disabled = false; btn.textContent = origText; return; }
+    const btn = $("#rp-generate", overlay); btn.disabled = true; btn.textContent = "جاري التوليد...";
+    const res = await callManageUsers({ action: "resetPassword", userId: p.id });
+    if (res.error) { toast(res.error, true); btn.disabled = false; btn.textContent = "توليد كلمة مرور مؤقتة"; return; }
     logAudit({ action: "إعادة تعيين كلمة مرور", entity: "user", entityName: p.full_name });
+    $("#rp-temp-pass", overlay).textContent = res.tempPassword;
     $("#rp-step1", overlay).classList.add("hidden");
     $("#rp-step2", overlay).classList.remove("hidden");
-    const passEl = $("#rp-temp-pass", overlay);
-    const actualPass = res.tempPassword;
-    passEl.textContent = actualPass;
-    passEl.dataset.raw = actualPass;
-    if (mode === "custom") {
-      // كلمة المرور دخلها المدير بنفسه (يعرفها بالفعل) — تظهر كنجوم فورًا بعد الحفظ لحمايتها من أي حد يشوف الشاشة
-      setTimeout(() => {
-        passEl.textContent = "•".repeat(Math.min(actualPass.length, 14));
-        $("#rp-masked-note", overlay).classList.remove("hidden");
-      }, 900);
-    }
   };
   $("#rp-copy", overlay).onclick = () => {
-    navigator.clipboard.writeText($("#rp-temp-pass", overlay).dataset.raw || $("#rp-temp-pass", overlay).textContent).then(() => toast("تم النسخ"));
+    navigator.clipboard.writeText($("#rp-temp-pass", overlay).textContent).then(() => toast("تم النسخ"));
   };
   $("#rp-done", overlay).onclick = () => overlay.remove();
 }
@@ -2605,9 +2617,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       clearLoginFailures(username.toLowerCase());
-      // تحديث "آخر تسجيل دخول" وتسجيل العملية بالسجل مش لازمين يوقفوا فتح البرنامج —
-      // بيتنفذوا في الخلفية (بدون انتظار) عشان يفتح البرنامج فورًا بعد جاهزية البيانات الأساسية
-      sb.from("profiles").update({ last_login: new Date().toISOString(), last_login_device: deviceInfo() }).eq("id", user.id);
+      await sb.from("profiles").update({ last_login: new Date().toISOString(), last_login_device: deviceInfo() }).eq("id", user.id);
       logAudit({ action: "تسجيل دخول", entity: "user", entityName: state.profile?.full_name || username });
       showApp();
       if (state.profile && state.profile.must_change_password) openChangePasswordModal(true);

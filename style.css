@@ -377,8 +377,6 @@ details.collapsible-card > summary:hover{background:var(--paper);}
   background:var(--card); width:100%; max-width:420px; border-radius:var(--r-lg); padding:24px;
   max-height:88vh; overflow:auto; box-shadow:var(--shadow-lg); animation:scaleIn .22s var(--ease);
 }
-.modal-box .lang-btn{background:#fff; color:var(--ink70); border:1.5px solid var(--ink12);}
-.modal-box .lang-btn.active-lang{background:var(--grad-primary); color:#fff; border-color:transparent;}
 .icon-btn{
   width:32px; height:32px; border-radius:9px; border:1.5px solid var(--ink12); background:#fff;
   display:inline-flex; align-items:center; justify-content:center; transition:all .15s ease; color:var(--ink70);
@@ -389,6 +387,8 @@ details.collapsible-card > summary:hover{background:var(--paper);}
 
 .chip{display:inline-flex; align-items:center; gap:6px; background:var(--paper-deep); padding:6px 11px; border-radius:999px; font-size:12.5px; font-weight:700;}
 .chip button{background:none; color:var(--ink50); font-size:13px; line-height:1;}
+.chip-ok{background:var(--green-soft); color:var(--green);}
+.chip-critical{background:var(--red-soft); color:var(--red);}
 
 .toast{
   position:fixed; bottom:24px; left:24px; z-index:80; background:var(--ink); color:#fff; padding:13px 19px;
