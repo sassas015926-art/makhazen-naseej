@@ -423,25 +423,6 @@ async function boot() {
     }
   });
 }
-  if (session) {
-    state.user = session.user;
-    await loadAll();
-    if (state.profile && state.profile.is_active === false) {
-      await sb.auth.signOut();
-      state.user = null; state.profile = null;
-      showLogin();
-      $("#login-error").textContent = "هذا الحساب موقوف حاليًا. تواصل مع مدير النظام.";
-      $("#login-error").classList.remove("hidden");
-    } else {
-      showApp();
-    }
-  } else {
-    showLogin();
-  }
-  sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT") { showLogin(); }
-  });
-}
 async function loadSettingsForLogin() {
   try { await loadSettings(); } catch (e) {}
   applyBranding();
@@ -762,8 +743,11 @@ function renderMoveBody(mode) {
   }
 
   const sel = state.selectedItem;
-  const resultQty = isIn ? sel.qty + sel.qty_input : Math.max(0, sel.qty - sel.qty_input);
-  const willCrit = sel.max_qty > 0 && (resultQty / sel.max_qty) * 100 <= (state.settings.alert_threshold_percent || 15);
+  const moveWarnHtml = () => {
+    const resultQty = isIn ? sel.qty + sel.qty_input : Math.max(0, sel.qty - sel.qty_input);
+    const willCrit = sel.max_qty > 0 && (resultQty / sel.max_qty) * 100 <= (state.settings.alert_threshold_percent || 15);
+    return willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : "";
+  };
   body.innerHTML = `
     <div class="card move-panel">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -782,17 +766,27 @@ function renderMoveBody(mode) {
       </div>
       ${!isIn ? `<div class="field"><label>${t("workerLabel")}</label><input id="worker-input" class="input" style="width:100%;" value="${state.profile?.full_name || ""}" placeholder="مثال: أحمد محمد"></div>` : ""}
       <div class="field"><label>${t("noteLabel")}</label><input id="note-input" class="input" style="width:100%;" placeholder="${isIn ? "مثال: توريد جديد من المورد" : "مثال: لتفصيلة قميص رجالي"}"></div>
-      ${willCrit ? `<div style="display:flex; gap:8px; align-items:center; background:var(--red-soft); color:var(--red); padding:9px 12px; border-radius:10px; font-size:12.5px; font-weight:700; margin-bottom:14px;">${icon("alert", 15)} بعد هذه العملية سيصبح الصنف ضمن المستوى الحرج (أقل من ${state.settings.alert_threshold_percent || 15}%)</div>` : ""}
+      <div id="move-warn">${moveWarnHtml()}</div>
       <button class="btn-primary" id="move-submit" style="background:${isIn ? "var(--green)" : "var(--ink)"}; display:flex; align-items:center; justify-content:center; gap:8px;">
         ${icon(isIn ? "in" : "out", 18)} ${isIn ? t("confirmIn") : t("confirmOut")}
       </button>
     </div>`;
 
+  // تحديث جزئي فقط (بدون إعادة رسم الشاشة بالكامل) عند تغيير الكمية،
+  // حتى لا يُعاد إنشاء زر "تأكيد" ويُفقد الضغط عليه (كان هذا سبب الحاجة لضغطتين)
+  const refreshWarn = () => { const w = $("#move-warn"); if (w) w.innerHTML = moveWarnHtml(); };
   $("#move-cancel").onclick = () => { state.selectedItem = null; renderMoveBody(mode); };
-  $("#qty-minus").onclick = () => { sel.qty_input = Math.max(1, sel.qty_input - 1); renderMoveBody(mode); };
-  $("#qty-plus").onclick = () => { sel.qty_input = sel.qty_input + 1; renderMoveBody(mode); };
-  $("#qty-input").onchange = (e) => { sel.qty_input = Math.max(1, Number(e.target.value) || 1); renderMoveBody(mode); };
-  $("#move-submit").onclick = async () => {
+  $("#qty-minus").onclick = () => { sel.qty_input = Math.max(1, sel.qty_input - 1); $("#qty-input").value = sel.qty_input; refreshWarn(); };
+  $("#qty-plus").onclick = () => { sel.qty_input = sel.qty_input + 1; $("#qty-input").value = sel.qty_input; refreshWarn(); };
+  $("#qty-input").oninput = (e) => { sel.qty_input = Math.max(1, Number(e.target.value) || 1); refreshWarn(); };
+
+  let moveSubmitting = false;
+  const submitMove = async () => {
+    if (moveSubmitting) return;
+    moveSubmitting = true;
+    const btn = $("#move-submit");
+    if (btn) btn.disabled = true;
+    try {
     const qty = sel.qty_input;
     const worker = isIn ? "" : ($("#worker-input")?.value || "").trim();
     const note = ($("#note-input")?.value || "").trim();
@@ -838,7 +832,18 @@ function renderMoveBody(mode) {
     state.selectedItem = null;
     await Promise.all([loadItems(), loadTransactions()]);
     render();
+    } finally {
+      moveSubmitting = false;
+      if (btn) btn.disabled = false;
+    }
   };
+
+  $("#move-submit").onclick = submitMove;
+  // دعم الحفظ بالضغط على Enter من أي حقل في شاشة الإدخال/السحب
+  const onEnterSave = (e) => { if (e.key === "Enter") { e.preventDefault(); submitMove(); } };
+  $("#qty-input").addEventListener("keydown", onEnterSave);
+  $("#note-input")?.addEventListener("keydown", onEnterSave);
+  if (!isIn) $("#worker-input")?.addEventListener("keydown", onEnterSave);
 }
 
 /* ---------------- stock table ---------------- */
