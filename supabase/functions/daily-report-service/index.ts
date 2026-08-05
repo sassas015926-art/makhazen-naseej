@@ -23,7 +23,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DEFAULT_FROM = "نظام إدارة المخازن <onboarding@resend.dev>";
+// نفس آلية email-service.ts بالضبط: العنوان يُقرأ من Secret اختياري EMAIL_FROM_ADDRESS
+const DEFAULT_FROM = Deno.env.get("EMAIL_FROM_ADDRESS") || "نظام إدارة المخازن <onboarding@resend.dev>";
 const TIMEZONE = "Europe/Istanbul";
 
 function json(body: unknown, status = 200) {
@@ -43,17 +44,31 @@ function istanbulNowParts() {
 
 Deno.serve(async (req) => {
   try {
-    // حماية: لازم النداء يكون من عندنا فعليًا (pg_cron بيستخدم service role key)
+    // حماية: النداء التلقائي من pg_cron لازم يكون بمفتاح service role.
+    // بالإضافة لذلك، بندعم نداء يدوي من مستخدم مسجّل دخول ودوره "admin" فقط
+    // (زر "إرسال تقرير تجريبي الآن" في شاشة الإعدادات) لأغراض التشخيص والاختبار.
     const authHeader = req.headers.get("Authorization") || "";
-    if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) {
-      return json({ error: "غير مصرح" }, 401);
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    let isManualTest = false;
+
+    if (authHeader === `Bearer ${SERVICE_ROLE_KEY}`) {
+      isManualTest = false;
+    } else {
+      const callerToken = authHeader.replace("Bearer ", "");
+      const { data: callerData } = callerToken ? await admin.auth.getUser(callerToken) : { data: null };
+      const { data: callerProfile } = callerData?.user
+        ? await admin.from("profiles").select("role, is_active").eq("id", callerData.user.id).single()
+        : { data: null };
+      if (!callerProfile || callerProfile.role !== "admin" || callerProfile.is_active === false) {
+        return json({ error: "غير مصرح" }, 401);
+      }
+      isManualTest = true;
     }
 
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data: settings } = await admin.from("settings").select("*").eq("id", 1).single();
     if (!settings) return json({ skipped: true, reason: "no settings row" });
 
-    if (!settings.daily_report_enabled) {
+    if (!settings.daily_report_enabled && !isManualTest) {
       return json({ skipped: true, reason: "daily_report_enabled = false" });
     }
 
@@ -62,12 +77,13 @@ Deno.serve(async (req) => {
     const nowMinutes = hour * 60 + minute;
     const targetMinutes = targetHour * 60 + targetMinute;
     const inWindow = nowMinutes >= targetMinutes && nowMinutes < targetMinutes + 15;
-    if (!inWindow) {
+    if (!inWindow && !isManualTest) {
       return json({ skipped: true, reason: `not in window (now ${hour}:${minute}, target ${settings.daily_report_time})` });
     }
 
-    // منع التكرار في نفس اليوم
-    if (settings.last_daily_report_sent_at) {
+    // منع التكرار في نفس اليوم (لا يُطبَّق على الاختبار اليدوي حتى لا يُعتبر التقرير
+    // "اتبعت النهاردة" ويمنع الإرسال التلقائي الحقيقي الساعة المحددة)
+    if (settings.last_daily_report_sent_at && !isManualTest) {
       const lastSentDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date(settings.last_daily_report_sent_at));
       if (lastSentDateStr === dateStr) {
         return json({ skipped: true, reason: "already sent today" });
@@ -168,9 +184,20 @@ Deno.serve(async (req) => {
       } catch (e) { results.telegram = { success: false, reason: String(e) }; }
     }
 
-    await admin.from("settings").update({ last_daily_report_sent_at: new Date().toISOString() }).eq("id", 1);
+    // لا نُسجّل "تم الإرسال" إلا لو كل قناة مُفعّلة (لها بيانات إعداد) نجحت فعليًا.
+    // القناة الغير مُفعَّلة أصلًا (زي لو الإيميل مش متظبط) لا تُعتبر فشلًا ولا توقف التسجيل.
+    // هذا يضمن: لو فشلت محاولة الساعة 4 (خطأ شبكة/مفتاح خاطئ)، هيتعاد المحاولة كل 15 دقيقة
+    // لحد ما تنجح أو ينتهي اليوم — بدل ما يتسجّل "تم" غلط ويوقف أي محاولة تانية.
+    const emailAttempted = !!(settings.resend_api_key && (settings.notify_emails || "").split(",").map((e: string) => e.trim()).filter(Boolean).length);
+    const telegramAttempted = !!(settings.telegram_bot_token && settings.telegram_chat_id);
+    const emailOk = !emailAttempted || results.email?.success === true;
+    const telegramOk = !telegramAttempted || results.telegram?.success === true;
 
-    return json({ sent: true, results });
+    if (!isManualTest && emailOk && telegramOk) {
+      await admin.from("settings").update({ last_daily_report_sent_at: new Date().toISOString() }).eq("id", 1);
+    }
+
+    return json({ sent: true, isManualTest, fullySucceeded: emailOk && telegramOk, results });
   } catch (e) {
     return json({ error: "حدث خطأ غير متوقع — " + (e?.message || "") }, 500);
   }
