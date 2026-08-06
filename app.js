@@ -1352,7 +1352,7 @@ function renderSettings(main) {
       const { data: { session } } = await sb.auth.getSession();
       const r = await fetch(`${SUPABASE_URL}/functions/v1/daily-report-service`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token || ""}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${session?.access_token || ""}`, "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
         body: JSON.stringify({}),
       });
       const rb = await r.json().catch(() => ({}));
@@ -1373,9 +1373,11 @@ function renderSettings(main) {
       toast(rb.fullySucceeded ? "تم إرسال التقرير التجريبي بنجاح" : "التقرير التجريبي واجه مشكلة — راجع التفاصيل أسفل الزر", !rb.fullySucceeded);
     } catch (e) {
       statusEl.style.color = "var(--red)";
-      statusEl.textContent = "خطأ الاتصال: " + e.message;
+      statusEl.textContent = "✗ خطأ الاتصال: " + (e && e.message ? e.message : "تعذّر الاتصال بخدمة daily-report-service");
       console.error(e);
       toast("تعذّر الاتصال بخدمة التقرير اليومي", true);
+    } finally {
+      btn.disabled = false; btn.textContent = "📨 إرسال تقرير تجريبي الآن";
     }
   };
 
