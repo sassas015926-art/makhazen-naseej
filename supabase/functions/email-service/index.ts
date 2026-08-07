@@ -15,6 +15,7 @@
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { wrapEmail } from "../_shared/email-template.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -149,15 +150,13 @@ if (action === "validate") {
           from: DEFAULT_FROM,
           to: [to],
           subject: "بريد اختباري — نظام إدارة المخازن ✅",
-          html: `
-            <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;padding:20px;color:#122A4A;">
-              <h2 style="margin:0 0 12px;">هذه رسالة اختبار ✅</h2>
-              <p>لو وصلتك الرسالة دي، يبقى إعدادات إرسال الإيميلات في نظام إدارة المخازن شغالة صح.</p>
-              <p style="color:#888;font-size:12px;margin-top:24px;">
-                تم الإرسال في: ${new Date().toLocaleString("ar-EG")}
-              </p>
-            </div>
-          `,
+          html: wrapEmail({
+            title: "✅ هذه رسالة اختبار",
+            bodyHtml: `
+              <p>لو وصلتك الرسالة دي، يبقى إعدادات إرسال الإيميلات في نظامك شغالة صح.</p>
+              <p style="color:#8A94A6; font-size:12px; margin-top:16px;">تم الإرسال في: ${new Date().toLocaleString("ar-EG")}</p>
+            `,
+          }),
         }),
       });
 
@@ -201,23 +200,22 @@ if (action === "validate") {
           from: DEFAULT_FROM,
           to,
           subject,
-          html: `
-            <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;padding:20px;color:#122A4A;">
-              <div style="background:${accentBg};border-right:4px solid ${accentColor};padding:12px 16px;border-radius:8px;margin-bottom:16px;">
-                <h2 style="margin:0;color:${accentColor};">${isCritical ? "🔴" : "🟡"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}</h2>
+          html: wrapEmail({
+            title: `${isCritical ? "🔴" : "🟡"} تنبيه مخزون ${isCritical ? "حرج" : "منخفض"}`,
+            accentColor: accentColor,
+            ctaLabel: "افتح المخزون الآن",
+            bodyHtml: `
+              <div style="background:${accentBg}; border-right:4px solid ${accentColor}; padding:12px 16px; border-radius:8px; margin-bottom:18px; font-weight:700; color:${accentColor};">
+                وصل الصنف إلى ${levelLabel}
               </div>
-              <p>وصل الصنف إلى ${levelLabel}.</p>
-
-              <p><b>الصنف:</b> ${itemName}</p>
-              <p><b>الكمية الحالية:</b> ${qty} ${unit}</p>
-              <p><b>الحد الأقصى:</b> ${maxQty} ${unit}</p>
-              <p><b>النسبة الحالية:</b> ${Number(pct).toFixed(1)}%</p>
-
-              <p style="color:#888;font-size:12px;margin-top:20px;">
-                نظام إدارة المخازن
-              </p>
-            </div>
-          `,
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13.5px;">
+                <tr><td style="padding:6px 0; color:#8A94A6; width:130px;">الصنف</td><td style="padding:6px 0; font-weight:700;">${itemName}</td></tr>
+                <tr><td style="padding:6px 0; color:#8A94A6;">الكمية الحالية</td><td style="padding:6px 0; font-weight:700;">${qty} ${unit}</td></tr>
+                <tr><td style="padding:6px 0; color:#8A94A6;">الحد الأقصى</td><td style="padding:6px 0; font-weight:700;">${maxQty} ${unit}</td></tr>
+                <tr><td style="padding:6px 0; color:#8A94A6;">النسبة الحالية</td><td style="padding:6px 0; font-weight:700; color:${accentColor};">${Number(pct).toFixed(1)}%</td></tr>
+              </table>
+            `,
+          }),
         }),
       });
 

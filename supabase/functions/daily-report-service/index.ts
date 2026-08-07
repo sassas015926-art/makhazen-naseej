@@ -20,6 +20,7 @@
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { wrapEmail } from "../_shared/email-template.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -160,15 +161,18 @@ Deno.serve(async (req) => {
           </tr>`).join("")
       : `<tr><td colspan="5" style="padding:14px; text-align:center; color:#888;">لا توجد أصناف تحتاج شراء حاليًا ✅</td></tr>`;
 
-    const htmlText = `
-      <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif; padding:20px; color:#122A4A; max-width:600px;">
-        <h2 style="margin:0 0 4px;">📊 تقرير حالة المخزن اليومي</h2>
-        <p style="color:#666; margin:0 0 20px;">${todayLabel} — الساعة ${nowLabel}</p>
-        <div style="display:flex; gap:12px; margin-bottom:22px;">
-          <div style="flex:1; background:#EEF5F6; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800;">${allItems.length}</div><div style="font-size:12px; color:#666;">إجمالي الأصناف</div></div>
-          <div style="flex:1; background:#FBEAE9; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800; color:#D6473F;">${criticalCount}</div><div style="font-size:12px; color:#666;">أصناف حرجة</div></div>
-          <div style="flex:1; background:#FAF0DC; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800; color:#A8701E;">${lowCount}</div><div style="font-size:12px; color:#666;">أصناف منخفضة</div></div>
-        </div>
+    const htmlText = wrapEmail({
+      title: "📊 تقرير حالة المخزن اليومي",
+      ctaLabel: "افتح لوحة التحكم",
+      bodyHtml: `
+        <p style="color:#8A94A6; margin:0 0 20px; font-size:13px;">${todayLabel} — الساعة ${nowLabel}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate; border-spacing:8px 0; margin-bottom:22px;">
+          <tr>
+            <td style="width:33%; background:#EEF5F6; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800;">${allItems.length}</div><div style="font-size:12px; color:#666;">إجمالي الأصناف</div></td>
+            <td style="width:33%; background:#FBEAE9; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800; color:#D6473F;">${criticalCount}</div><div style="font-size:12px; color:#666;">أصناف حرجة</div></td>
+            <td style="width:33%; background:#FAF0DC; border-radius:10px; padding:12px; text-align:center;"><div style="font-size:22px; font-weight:800; color:#A8701E;">${lowCount}</div><div style="font-size:12px; color:#666;">أصناف منخفضة</div></td>
+          </tr>
+        </table>
         <h3 style="margin:0 0 10px; font-size:15px;">🛒 الأصناف المطلوب شراؤها</h3>
         <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:22px;">
           <thead><tr style="background:#DFEBEC; text-align:right;">
@@ -177,8 +181,9 @@ Deno.serve(async (req) => {
           <tbody>${purchaseRowsHtml}</tbody>
         </table>
         <h3 style="margin:0 0 8px; font-size:14px;">حركات اليوم (${todayTx.length})</h3>
-        <pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; background:#F7F8FA; padding:10px; border-radius:8px;">${latestTxText}</pre>
-      </div>`;
+        <pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; background:#F7F8FA; padding:10px; border-radius:8px; margin:0;">${latestTxText}</pre>
+      `,
+    });
 
     const results: any = { email: null, telegram: null };
 
