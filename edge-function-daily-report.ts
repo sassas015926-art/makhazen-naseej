@@ -126,14 +126,21 @@ Deno.serve(async (req) => {
     const criticalCount = needsPurchase.filter(it => it.status === "critical").length;
     const lowCount = needsPurchase.filter(it => it.status === "low").length;
 
-    const { data: latestTx } = await admin.from("transactions").select("item_name, type, qty, unit, created_at").order("created_at", { ascending: false }).limit(8);
+    // حركات اليوم فعليًا (بتوقيت اسطنبول) — مش "آخر 8 حركات" بغض النظر عن تاريخها.
+    // بنجيب دفعة كافية ونفلترها بنفس أسلوب مقارنة التاريخ المستخدم فوق لمنع التكرار اليومي،
+    // عشان لو يوم مزدحم (أكتر من صف واحد) تظهر كل حركاته من غير ما يضيع أي شيء.
+    const { data: recentTxRaw } = await admin.from("transactions").select("item_name, type, qty, unit, created_at").order("created_at", { ascending: false }).limit(500);
+    const todayTx = (recentTxRaw || []).filter(t => {
+      const txDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date(t.created_at));
+      return txDateStr === dateStr;
+    });
+    const latestTxText = todayTx.length
+      ? todayTx.map(t => `• ${t.item_name} — ${t.type === "in" ? "إدخال" : "سحب"} ${t.qty} ${t.unit || ""}`).join("\n")
+      : "لا توجد حركات مسجّلة اليوم";
 
     const todayLabel = new Date().toLocaleDateString("ar-EG", { timeZone: TIMEZONE, year: "numeric", month: "long", day: "numeric" });
     const nowLabel = new Date().toLocaleTimeString("ar-EG", { timeZone: TIMEZONE, hour: "2-digit", minute: "2-digit" });
     const statusLabel = (s: string) => (s === "critical" ? "حرج" : "منخفض");
-    const latestTxText = (latestTx || []).length
-      ? latestTx!.map(t => `• ${t.item_name} — ${t.type === "in" ? "إدخال" : "سحب"} ${t.qty} ${t.unit || ""}`).join("\n")
-      : "لا توجد حركات مسجّلة";
 
     // ---------- محتوى Telegram: ملخص سريع + أسماء الأصناف بس (بدون تفاصيل) ----------
     const tgItemNames = needsPurchase.length
@@ -169,7 +176,7 @@ Deno.serve(async (req) => {
           </tr></thead>
           <tbody>${purchaseRowsHtml}</tbody>
         </table>
-        <h3 style="margin:0 0 8px; font-size:14px;">آخر عمليات المخزن</h3>
+        <h3 style="margin:0 0 8px; font-size:14px;">حركات اليوم (${todayTx.length})</h3>
         <pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; background:#F7F8FA; padding:10px; border-radius:8px;">${latestTxText}</pre>
       </div>`;
 
