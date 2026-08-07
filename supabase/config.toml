@@ -382,6 +382,13 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+# دالة التقرير اليومي تُستدعى بطريقتين: تلقائيًا من pg_cron بمفتاح service_role
+# (مش JWT مستخدم عادي فمش هيعدي تحقق JWT الافتراضي)، ويدويًا من زر "إرسال تقرير تجريبي الآن"
+# داخل التطبيق. لازم نعطّل تحقق JWT الإجباري على مستوى بوابة Supabase لهذه الدالة تحديدًا،
+# والتحقق الحقيقي من الهوية بيحصل داخل كود الدالة نفسها (مفتاح service_role أو مستخدم admin مسجّل دخول).
+[functions.daily-report-service]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

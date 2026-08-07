@@ -11,7 +11,7 @@
 //     مش هيصلح هنا أصلًا.
 //
 // الحماية: بنتأكد إن اللي بينادي الفنكشن هو نفسه (Authorization يطابق
-// service role key بتاعنا فعليًا)، عشان محدش يقدر يستدعيها من برة.
+// service role key بتاعنا فعليًا) أو مستخدم admin مسجّل دخول (للاختبار اليدوي).
 //
 // النشر (مرة واحدة):
 //   supabase functions deploy daily-report-service --no-verify-jwt
@@ -23,12 +23,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-// نفس آلية email-service.ts بالضبط: العنوان يُقرأ من Secret اختياري EMAIL_FROM_ADDRESS
+// نفس آلية email-service.ts بالظبط: العنوان يُقرأ من Secret اختياري EMAIL_FROM_ADDRESS
 const DEFAULT_FROM = Deno.env.get("EMAIL_FROM_ADDRESS") || "نظام إدارة المخازن <onboarding@resend.dev>";
 const TIMEZONE = "Europe/Istanbul";
 
+// رؤوس CORS + دالة JSON موحّدة — بنفس النمط المُختبَر والناجح فعليًا في email-service.ts.
+// كانت ناقصة تمامًا في هذا الملف، وهذا كان السبب الحقيقي لخطأ CORS في المتصفح
+// عند استخدام زر "إرسال تقرير تجريبي الآن".
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
 }
 
 // وقت اسطنبول الحالي بشكل دقيق (باستخدام قاعدة بيانات المناطق الزمنية الرسمية، مش حساب يدوي)
@@ -43,6 +58,11 @@ function istanbulNowParts() {
 }
 
 Deno.serve(async (req) => {
+  // المتصفح (لما يستخدم زر "إرسال تجريبي الآن") بيبعت طلب OPTIONS تمهيدي قبل الطلب الحقيقي.
+  // pg_cron (النداء التلقائي) بيبعت POST مباشرة فمبيمرش من هنا أصلًا.
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
   try {
     // حماية: النداء التلقائي من pg_cron لازم يكون بمفتاح service role.
     // بالإضافة لذلك، بندعم نداء يدوي من مستخدم مسجّل دخول ودوره "admin" فقط

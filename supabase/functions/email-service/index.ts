@@ -24,7 +24,11 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // طالما مفيش نطاق (domain) موثّق في حساب Resend. لو عايز تبعت لأي إيميل
 // تاني (زي إيميلات العمال)، لازم توثّق نطاقك الخاص في Resend وتغيّر
 // السطر ده لإيميل من نطاقك، مثال: "تنبيهات المخزن <alerts@yourdomain.com>"
-const DEFAULT_FROM = "نظام إدارة المخازن <onboarding@resend.dev>";
+// يمكن استبدال هذا العنوان لاحقًا بدون تعديل الكود إطلاقًا: يكفي إضافة
+// Secret باسم EMAIL_FROM_ADDRESS في Supabase (Project Settings → Edge Functions → Secrets)
+// بقيمة مثل: "تنبيهات المخزن <alerts@yourdomain.com>" — بعد ربط نطاقك في Resend.
+// طالما السِّر غير موجود، يُستخدم العنوان التجريبي الافتراضي كما هو الآن.
+const DEFAULT_FROM = Deno.env.get("EMAIL_FROM_ADDRESS") || "نظام إدارة المخازن <onboarding@resend.dev>";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
